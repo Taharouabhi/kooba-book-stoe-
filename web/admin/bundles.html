@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إدارة الباقات — لوحة تحكم مكتبة القبة</title>
+<link rel="icon" href="../assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-admin="1" data-page="bundles" data-title="إدارة الباقات">
+<div class="dash">
+  <div id="dash-side"></div>
+  <div class="dash-main">
+    <div id="dash-top"></div>
+    <div class="dash-content">
+      <div class="dpage-head">
+        <div>
+          <h2>الباقات</h2>
+          <p>أنشئ تجميعات كتب بسعر مخفّض وشجّع العملاء على الشراء بالجملة.</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="addBtn"><svg class="icon"><use href="#i-plus"/></svg> إضافة باقة</button>
+        </div>
+      </div>
+
+      <div class="dcard">
+        <div class="table-scroll">
+          <table class="grid-t">
+            <thead><tr><th>الباقة</th><th>عدد الكتب</th><th>السعر</th><th>التوفير</th><th>مفعّلة</th><th>إجراءات</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="pkModal" role="dialog" aria-modal="true" aria-label="إضافة باقة">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-head">
+      <h3 id="mTitle">إضافة باقة</h3>
+      <button class="close-x" data-close aria-label="إغلاق"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="modal-body" style="max-height:70vh">
+      <div class="form-grid">
+        <div class="field full"><label>اسم الباقة *</label><input class="input" id="pName" placeholder="مثال: باقة الأدب الكلاسيكي"></div>
+        <div class="field"><label>سعر الباقة (دج) *</label><input class="input num" id="pPrice" type="number" placeholder="1500"></div>
+        <div class="field"><label>السعر قبل الخصم</label><input class="input num" id="pOld" type="number" placeholder="2000"></div>
+      </div>
+      <div class="form-sec">
+        <h4>الكتب المشمولة</h4>
+        <div id="pBooks" style="max-height:220px;overflow:auto;border:1px solid var(--muted);border-radius:var(--r-sm);padding:10px"></div>
+      </div>
+      <div class="form-sec">
+        <h4>وصف الباقة</h4>
+        <textarea class="textarea" id="pDesc" placeholder="وصف مختصر يظهر للعملاء..."></textarea>
+      </div>
+      <label class="filter-item mt-2"><input type="checkbox" id="pActive" checked><span class="check"><svg class="icon"><use href="#i-check"/></svg></span> باقة مفعّلة وظاهرة في المتجر</label>
+    </div>
+    <div class="modal-foot"><button class="btn btn-primary btn-block" id="savePk">حفظ الباقة</button></div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+(async function(){
+  const K = window.KBS, D = K.D, A = KBS_API;
+  if (!(await A.requireAdminSession())) return;
+
+  const rows = document.getElementById('rows');
+  const modal = document.getElementById('pkModal');
+  const f = id => document.getElementById(id);
+  let editingId = null;
+  let selected = new Set();
+  let saving = false;
+
+  function render(){
+    rows.innerHTML = D.bundles.map(p => `
+      <tr>
+        <td><div class="flex items-center gap-1">
+          <span class="t-stack">${(p.covers||[]).slice(0,2).map(c=>`<span class="t-thumb"><img src="${K.u(D.img(c))}" alt=""></span>`).join('')}</span>
+          <span class="t-title">${K.esc(p.name)}</span></div></td>
+        <td class="t-num">${p.count}</td>
+        <td><span class="t-num">${K.formatDZD(p.price)}</span> ${p.old ? `<span class="muted" style="text-decoration:line-through;font-size:13px">${K.formatDZD(p.old)}</span>` : ''}</td>
+        <td><span class="pill done"><span class="dot"></span>${p.save}%</span></td>
+        <td><button class="switch ${p.active?'':'off'}" data-toggle="${p.id}" aria-label="تفعيل"></button></td>
+        <td><div class="row-actions">
+          <button class="ra" data-edit="${p.id}" title="تعديل">${K.icon('edit')}</button>
+          <button class="ra danger" data-del="${p.id}" title="حذف">${K.icon('trash')}</button>
+        </div></td>
+      </tr>`).join('');
+  }
+  render();
+
+  function fillBooks(){
+    f('pBooks').innerHTML = D.books.map(b => `
+      <label class="filter-item" style="padding:6px 4px">
+        <input type="checkbox" data-book="${b.id}" ${selected.has(b.id)?'checked':''}>
+        <span style="flex:1">${K.esc(b.title)}</span>
+        <span class="muted num" style="font-size:13px">${K.formatDZD(b.price)}</span>
+      </label>`).join('');
+  }
+  f('pBooks').addEventListener('change', e => {
+    const cb = e.target.closest('[data-book]'); if (!cb) return;
+    cb.checked ? selected.add(cb.dataset.book) : selected.delete(cb.dataset.book);
+  });
+
+  function open(pk){
+    editingId = pk ? pk.id : null;
+    selected = new Set(pk ? pk.bookIds : []);
+    f('mTitle').textContent = pk ? 'تعديل الباقة' : 'إضافة باقة';
+    f('pName').value = pk ? pk.name : '';
+    f('pPrice').value = pk ? pk.price : '';
+    f('pOld').value = pk && pk.old ? pk.old : '';
+    f('pDesc').value = pk ? (pk.desc||'') : '';
+    f('pActive').checked = pk ? pk.active : true;
+    fillBooks();
+    modal.classList.add('open');
+  }
+  f('addBtn').addEventListener('click', () => open(null));
+  modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-close]')) modal.classList.remove('open'); });
+
+  async function reload(){
+    await A.refreshCatalog();
+    render();
+  }
+
+  f('savePk').addEventListener('click', async () => {
+    if (saving) return;
+    const name = f('pName').value.trim();
+    const price = parseInt(f('pPrice').value, 10);
+    if (!name || !Number.isFinite(price) || price < 0) { K.toast('أدخل اسم الباقة وسعرها أولاً'); return; }
+    if (!selected.size) { K.toast('اختر كتاباً واحداً على الأقل للباقة'); return; }
+    const existing = editingId ? D.bundles.find(x => x.id === editingId) : null;
+    const books = D.books.filter(b => selected.has(b.id));
+    const sum = books.reduce((s,b)=>s+b.price,0);
+    const oldVal = parseInt(f('pOld').value, 10);
+    const old = Number.isFinite(oldVal) && oldVal > 0 ? oldVal : sum;
+    const bundle = Object.assign({}, existing || {}, {
+      id: existing ? existing.id : 'pk-' + Date.now().toString(36),
+      name, price,
+      old: Math.max(price, old),
+      count: books.length,
+      active: f('pActive').checked,
+      bookIds: books.map(b => b.id),
+      covers: books.slice(0,3).map(b => b.cover),
+      desc: f('pDesc').value.trim(),
+      save: old > price ? Math.round((1 - price/old) * 100) : 0,
+    });
+    saving = true;
+    f('savePk').disabled = true;
+    const r = await A.adminRequest('admin.bundles.save', { bundle });
+    saving = false;
+    f('savePk').disabled = false;
+    if (!r.ok) { K.toast(A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r.error)); return; }
+    modal.classList.remove('open');
+    K.toast(existing ? 'تم تحديث الباقة' : 'تمت إضافة الباقة');
+    reload();
+  });
+
+  rows.addEventListener('click', async e => {
+    const t = e.target.closest('[data-toggle]');
+    if (t) {
+      const p = D.bundles.find(x => x.id === t.dataset.toggle);
+      if (!p) return;
+      const upd = Object.assign({}, p, { active: !p.active });
+      const r = await A.adminRequest('admin.bundles.save', { bundle: upd });
+      if (!r.ok) { K.toast(A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r.error)); return; }
+      K.toast(upd.active ? 'تم تفعيل الباقة' : 'تم إيقاف الباقة');
+      reload();
+      return;
+    }
+    const ed = e.target.closest('[data-edit]');
+    if (ed) { open(D.bundles.find(x => x.id === ed.dataset.edit)); return; }
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      const p = D.bundles.find(x => x.id === del.dataset.del);
+      if (!p || !confirm('حذف "' + p.name + '" نهائياً؟')) return;
+      const r = await A.adminRequest('admin.bundles.delete', { id: p.id });
+      if (!r.ok) { K.toast(A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r.error)); return; }
+      K.toast('تم حذف الباقة');
+      reload();
+    }
+  });
+})();
+</script>
+</body>
+</html>

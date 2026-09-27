@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مكتبة القبة — Kouba Book Store</title>
+<meta name="description" content="مكتبة القبة: أفضل مكتبة لبيع الكتب في الجزائر. روايات، تاريخ، أدب، فلسفة وباقات كتب مميزة بتوصيل سريع لكل الولايات.">
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="home">
+<div id="site-header"></div>
+
+<main class="container">
+  <!-- كتاب الشهر -->
+  <section class="month" id="month" aria-label="كتاب الشهر"></section>
+
+  <!-- التصنيفات -->
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">التصنيفات</h2></div>
+    <div class="chip-row" id="catChips"></div>
+  </section>
+
+  <!-- باقات الكتب المميزة -->
+  <section class="section">
+    <div class="section-head">
+      <h2 class="section-title">باقات الكتب المميزة</h2>
+      <a class="link-all" href="bundles.html">عرض الكل <span id="la1"></span></a>
+    </div>
+    <div class="grid grid-3" id="bundleGrid"></div>
+  </section>
+
+  <!-- وصل حديثاً -->
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">وصل حديثاً</h2></div>
+    <div class="grid grid-4" id="newGrid"></div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+  const K = window.KBS, D = K.D, R = K.renderers;
+  document.getElementById('la1').innerHTML = K.icon('chevron-left');
+
+  function render(){
+    // Book of the month
+    const m = D.books.find(b => b.monthPick) || D.books[0];
+    const off = m.old ? Math.round((1 - m.price/m.old)*100) : 0;
+    document.getElementById('month').innerHTML = `
+      <div class="month-body">
+        <span class="month-kicker">${K.icon('star','fill')} كتاب الشهر</span>
+        <h2 class="month-title">${K.esc(m.title)}: دراسة تحليلية</h2>
+        <p class="month-desc">${K.esc(m.desc)}</p>
+        <div class="month-buy">
+          <button class="btn btn-primary" data-add-to-cart="${m.id}">${K.icon('cart')} أضف إلى السلة</button>
+          <div class="month-price">
+            <span class="now">${K.formatDZD(m.price)}</span>
+            ${m.old ? `<span class="was">${K.formatDZD(m.old)}</span>` : ''}
+          </div>
+          ${off ? `<span class="badge badge-off" style="position:static">وفّر ${off}%</span>` : ''}
+        </div>
+      </div>
+      <div class="month-fig">
+        <img src="${K.u(m.coverUrl)}" alt="${K.esc(m.title)}">
+        <span class="newbadge">${K.icon('truck')} وصل حديثًا</span>
+      </div>`;
+
+    // Categories chips
+    document.getElementById('catChips').innerHTML = D.categories.map(c => R.categoryChip(c)).join('');
+
+    // Featured bundles
+    const featured = D.bundles.filter(b => b.featured);
+    document.getElementById('bundleGrid').innerHTML = featured.map(R.bundleCard).join('');
+
+    // New arrivals: latest 4 books from the live catalog
+    const arrivals = D.books.slice(0, 4);
+    document.getElementById('newGrid').innerHTML = arrivals.map(R.homeCard).join('');
+  }
+  render();
+  KBS_API.refreshCatalog(render);
+})();
+</script>
+</body>
+</html>

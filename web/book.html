@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تفاصيل الكتاب — مكتبة القبة</title>
+<meta name="description" content="تفاصيل الكتاب والسعر وطريقة الطلب من مكتبة القبة.">
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="">
+<div id="site-header"></div>
+
+<main class="container">
+  <nav class="crumbs green" style="padding-block:22px 0" aria-label="مسار التنقل">
+    <a href="index.html">الرئيسية</a><span class="sep">/</span>
+    <a href="category.html" id="crumbCat">التصنيفات</a><span class="sep">/</span>
+    <span class="current" id="crumbCur">الكتاب</span>
+  </nav>
+
+  <section class="pd" style="padding-block:26px" id="pd"></section>
+
+  <section class="tabs" id="tabs" role="tablist">
+    <button class="tab active" data-tab="desc" role="tab">الوصف</button>
+    <button class="tab" data-tab="spec" role="tab">المواصفات</button>
+    <button class="tab" data-tab="rev" role="tab">التقييمات</button>
+  </section>
+  <div class="tab-panel active" id="panel-desc"></div>
+  <div class="tab-panel" id="panel-spec"></div>
+  <div class="tab-panel" id="panel-rev"></div>
+
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">كتب مشابهة</h2></div>
+    <div class="grid grid-4" id="related"></div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+  const K = window.KBS, D = K.D, R = K.renderers;
+  const id = new URLSearchParams(location.search).get('id') || 'b1';
+
+  function render(){
+    const b = D.books.find(x => x.id === id) || D.books[0];
+    if (!b) return;
+    document.title = b.title + ' — مكتبة القبة';
+    document.getElementById('crumbCur').textContent = b.title;
+    const cat = D.categories.find(c => c.id === b.cat);
+    if (cat) { document.getElementById('crumbCat').textContent = cat.name; document.getElementById('crumbCat').href = 'category.html?c=' + cat.id; }
+
+    const gallery = b.gallery && b.gallery.length ? b.gallery : [b.cover];
+    const off = b.old ? Math.round((1 - b.price / b.old) * 100) : 0;
+    const out = b.stock === 0;
+
+    document.getElementById('pd').innerHTML = `
+    <div class="pd-gallery">
+      <div class="pd-main-img">
+        ${b.isNew ? `<span class="badge badge-new start">جديد</span>` : ''}
+        ${off ? `<span class="badge badge-off end">خصم ${off}%</span>` : ''}
+        <img id="mainImg" src="${K.u(D.img(gallery[0]))}" alt="${K.esc(b.title)}">
+      </div>
+      <div class="pd-thumbs">
+        ${gallery.map((g,i) => `<button class="${i===0?'active':''}" data-thumb="${K.u(D.img(g))}"><img src="${K.u(D.img(g))}" alt=""></button>`).join('')}
+      </div>
+    </div>
+    <div class="pd-info">
+      <h1>${K.esc(b.title)}</h1>
+      <div class="pd-author">${K.esc(b.author)}</div>
+      <div class="pd-tags">${(b.tags||[]).map(t => `<span class="tag">${K.esc(t)}</span>`).join('')}<span class="tag green">${K.esc(b.catLabel)}</span></div>
+      <div class="rating">
+        <span class="stars">${K.stars(b.rating)}</span>
+        <b class="num">${b.rating}</b>
+        <span class="count">(${K.num(b.reviews)} تقييم)</span>
+      </div>
+      <div class="pd-price">
+        <span class="now">${K.formatDZD(b.price)}</span>
+        ${b.old ? `<span class="was">${K.formatDZD(b.old)}</span><span class="save">وفّر ${off}%</span>` : ''}
+      </div>
+      <p class="pd-desc">${K.esc(b.desc)}</p>
+      <div class="pd-buy">
+        <div class="stepper" aria-label="الكمية">
+          <button data-step="-1" aria-label="إنقاص">−</button>
+          <span class="val num" data-qty-val>1</span>
+          <button data-step="1" aria-label="زيادة">+</button>
+        </div>
+        <button class="btn btn-primary btn-lg" data-add-to-cart="${b.id}" ${out?'disabled style="opacity:.5;cursor:not-allowed"':''}>
+          ${K.icon('cart')} ${out ? 'غير متوفر حالياً' : 'أضف إلى السلة'}
+        </button>
+        <button class="wish" data-wish aria-label="أضف إلى المفضلة">${K.icon('heart')}</button>
+      </div>
+      <div class="pd-assure">
+        <div class="assure"><span class="ic">${K.icon('truck')}</span><div><b>توصيل سريع</b><span>لكل الولايات 24-72 ساعة</span></div></div>
+        <div class="assure"><span class="ic">${K.icon('shield')}</span><div><b>الدفع عند الاستلام</b><span>ادفع بعد استلام طلبك</span></div></div>
+        <div class="assure"><span class="ic">${K.icon('refresh')}</span><div><b>إرجاع مجاني</b><span>خلال 7 أيام من الاستلام</span></div></div>
+        <div class="assure"><span class="ic">${K.icon('check-circle')}</span><div><b>نسخة أصلية</b><span>طبعة موثوقة ومضمونة</span></div></div>
+      </div>
+    </div>`;
+
+    // gallery thumbs
+    document.querySelectorAll('[data-thumb]').forEach(btn => btn.addEventListener('click', () => {
+      document.getElementById('mainImg').src = btn.dataset.thumb;
+      document.querySelectorAll('[data-thumb]').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+    }));
+    // stepper
+    document.querySelectorAll('[data-step]').forEach(btn => btn.addEventListener('click', () => {
+      const v = document.querySelector('[data-qty-val]');
+      v.textContent = Math.max(1, parseInt(v.textContent,10) + parseInt(btn.dataset.step,10));
+    }));
+    // wishlist toggle
+    document.querySelector('[data-wish]').addEventListener('click', e => e.currentTarget.classList.toggle('active'));
+
+    // tab panels
+    document.getElementById('panel-desc').innerHTML = `<p>${K.esc(b.desc)}</p>${b.desc2 ? `<p>${K.esc(b.desc2)}</p>` : ''}`;
+    document.getElementById('panel-spec').innerHTML = `<dl class="spec">
+      <dt>المؤلف</dt><dd>${K.esc(b.author)}</dd>
+      <dt>الناشر</dt><dd>${K.esc(b.publisher)}</dd>
+      <dt>عدد الصفحات</dt><dd class="num">${b.pages}</dd>
+      <dt>اللغة</dt><dd>${K.esc(b.lang)}</dd>
+      <dt>التصنيف</dt><dd>${K.esc(b.catLabel)}</dd>
+      <dt>التوفر</dt><dd>${out ? 'غير متوفر' : 'متوفر (' + b.stock + ' نسخة)'}</dd>
+    </dl>`;
+    document.getElementById('panel-rev').innerHTML = `
+      <div class="rating" style="margin:0 0 10px"><span class="stars">${K.stars(b.rating)}</span><b class="num">${b.rating}</b><span class="count">من ${K.num(b.reviews)} تقييم</span></div>
+      <p>آراء القراء حول هذا الكتاب إيجابية في مجملها، ويشيد معظمهم بجودة الطبعة وسلاسة الأسلوب وسرعة التوصيل.</p>`;
+
+    // related
+    const rel = D.books.filter(x => x.cat === b.cat && x.id !== b.id).slice(0,4);
+    const fill = rel.concat(D.books.filter(x => x.id !== b.id && !rel.includes(x))).slice(0,4);
+    document.getElementById('related').innerHTML = fill.map(R.productCard).join('');
+  }
+
+  // tabs (static buttons, attached once)
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+  }));
+
+  render();
+  KBS_API.refreshCatalog(render);
+})();
+</script>
+</body>
+</html>

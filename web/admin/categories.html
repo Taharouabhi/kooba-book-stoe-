@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إدارة التصنيفات — لوحة تحكم مكتبة القبة</title>
+<link rel="icon" href="../assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-admin="1" data-page="categories" data-title="إدارة التصنيفات">
+<div class="dash">
+  <div id="dash-side"></div>
+  <div class="dash-main">
+    <div id="dash-top"></div>
+    <div class="dash-content">
+      <div class="dpage-head">
+        <div>
+          <h2>التصنيفات</h2>
+          <p>نظّم كتبك داخل تصنيفات واضحة يسهل تصفحها.</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="addBtn"><svg class="icon"><use href="#i-plus"/></svg> إضافة تصنيف</button>
+        </div>
+      </div>
+      <div class="bento" id="grid"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="catModal" role="dialog" aria-modal="true" aria-label="إضافة تصنيف">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="mTitle">إضافة تصنيف</h3>
+      <button class="close-x" data-close aria-label="إغلاق"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field mb-3"><label>اسم التصنيف *</label><input class="input" id="cName" placeholder="مثال: روايات"></div>
+      <div class="field mb-3"><label>الأيقونة</label>
+        <span class="select-wrap"><select id="cIcon">
+          <option value="book">كتاب</option><option value="landmark">تاريخ</option><option value="feather">أدب</option>
+          <option value="moon">ديني</option><option value="bulb">فلسفة</option><option value="atom">علوم</option>
+          <option value="smile">أطفال</option><option value="grid">عام</option>
+        </select><svg class="icon"><use href="#i-chevron-down"/></svg></span>
+      </div>
+      <div class="field"><label>وصف مختصر</label><input class="input" id="cDesc" placeholder="وصف يظهر في صفحة التصنيف"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-primary btn-block" id="saveCat">حفظ التصنيف</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+(async function(){
+  const K = window.KBS, D = K.D, A = KBS_API;
+  if (!(await A.requireAdminSession())) return;
+
+  const modal = document.getElementById('catModal');
+  const f = id => document.getElementById(id);
+  let editingId = null;
+  let saving = false;
+
+  function render(){
+    document.getElementById('grid').innerHTML = D.categories.map(K.renderers.catCard).join('');
+  }
+  render();
+
+  function open(cat){
+    editingId = cat ? cat.id : null;
+    f('mTitle').textContent = cat ? 'تعديل التصنيف' : 'إضافة تصنيف';
+    f('cName').value = cat ? cat.name : '';
+    f('cIcon').value = cat ? cat.icon : 'book';
+    f('cDesc').value = cat ? (cat.desc||'') : '';
+    modal.classList.add('open');
+  }
+  f('addBtn').addEventListener('click', () => open(null));
+  modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-close]')) modal.classList.remove('open'); });
+
+  async function reload(){
+    await A.refreshCatalog();
+    render();
+  }
+
+  f('saveCat').addEventListener('click', async () => {
+    if (saving) return;
+    const name = f('cName').value.trim();
+    if (!name) { K.toast('أدخل اسم التصنيف أولاً'); return; }
+    const existing = editingId ? D.categories.find(c => c.id === editingId) : null;
+    const cat = Object.assign({}, existing || {}, {
+      id: existing ? existing.id : 'cat-' + Date.now().toString(36),
+      name,
+      icon: f('cIcon').value,
+      desc: f('cDesc').value.trim(),
+      count: D.books.filter(b => b.cat === (existing ? existing.id : '')).length,
+    });
+    saving = true;
+    f('saveCat').disabled = true;
+    const r = await A.adminRequest('admin.categories.save', { category: cat });
+    saving = false;
+    f('saveCat').disabled = false;
+    if (!r.ok) { K.toast(A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r.error)); return; }
+    modal.classList.remove('open');
+    K.toast(existing ? 'تم تحديث التصنيف' : 'تمت إضافة التصنيف');
+    reload();
+  });
+
+  document.getElementById('grid').addEventListener('click', async e => {
+    const card = e.target.closest('[data-cat-id]');
+    const cat = card ? D.categories.find(c => c.id === card.dataset.catId) : null;
+    if (e.target.closest('.ra.danger')) {
+      if (!cat || !confirm('حذف تصنيف "' + cat.name + '"؟ الكتب المصنفة فيه لن تُحذف.')) return;
+      const r = await A.adminRequest('admin.categories.delete', { id: cat.id });
+      if (!r.ok) { K.toast(A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r.error)); return; }
+      K.toast('تم حذف التصنيف');
+      reload();
+    } else if (e.target.closest('.ra')) {
+      open(cat);
+    }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سلة المشتريات — مكتبة القبة</title>
+<meta name="description" content="مراجعة سلة المشتريات وإتمام الطلب من مكتبة القبة.">
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="">
+<div id="site-header"></div>
+
+<main class="container">
+  <nav class="crumbs green" style="padding-block:22px 0" aria-label="مسار التنقل">
+    <a href="index.html">الرئيسية</a><span class="sep">/</span><span class="current">سلّة التسوق</span>
+  </nav>
+  <div class="hero-head"><h1 class="page-title">سلّة التسوق</h1></div>
+
+  <div id="emptyState" class="hidden">
+    <div class="state">
+      <div class="state-illus"><img src="assets/img/empty-cart.png" alt=""></div>
+      <h1>سلتك فارغة</h1>
+      <p>يبدو أنك لم تضف أي كتب بعد. تصفح مجموعتنا واختر ما يعجبك.</p>
+      <div class="success-actions">
+        <a class="btn btn-primary" href="category.html">تصفح الكتب</a>
+        <a class="btn btn-quiet" href="bundles.html">عرض الباقات</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="cart-layout" id="cartLayout" style="padding-block:26px">
+    <section class="panel">
+      <h2 class="panel-title">المنتجات (<span class="num" id="itemCount">0</span>)</h2>
+      <div id="items"></div>
+    </section>
+    <aside class="panel panel-alt summary">
+      <h2 class="panel-title">ملخص الطلب</h2>
+      <div class="sum-row"><span>المجموع الفرعي</span><span class="v" id="sub">0 د.ج</span></div>
+      <div class="sum-row"><span>التوصيل</span><span class="v" id="ship">يُحسب عند الدفع</span></div>
+      <div class="sum-row total"><span>الإجمالي</span><span class="v" id="tot">0 د.ج</span></div>
+      <div class="notice" id="freeNote"><svg class="icon"><use href="#i-truck"/></svg> أضف كتباً بقيمة 3,000 دج للحصول على توصيل مجاني.</div>
+      <a class="order-btn" href="checkout.html"><span>إتمام الطلب</span><span class="pill num" id="pillCount">0</span></a>
+      <a class="btn btn-ghost btn-block mt-2" href="category.html">متابعة التسوق</a>
+    </aside>
+  </div>
+</main>
+
+<div id="site-footer"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+  const K = window.KBS, C = K.Cart;
+  const FREE = 3000;
+  function render(){
+    const empty = C.items.length === 0;
+    document.getElementById('emptyState').classList.toggle('hidden', !empty);
+    document.getElementById('cartLayout').classList.toggle('hidden', empty);
+    if (empty) return;
+    document.getElementById('itemCount').textContent = C.count();
+    document.getElementById('pillCount').textContent = C.count();
+    document.getElementById('items').innerHTML = C.items.map(i => `
+      <div class="cart-item">
+        <span class="thumb"><img src="${i.cover}" alt=""></span>
+        <div class="ci-info">
+          <div class="ci-title">${K.esc(i.title)}</div>
+          <div class="ci-meta">${i.type === 'bundle' ? 'باقة كتب' : 'كتاب'} · ${K.formatDZD(i.price)} للنسخة</div>
+          <div class="ci-price">${K.formatDZD(i.price * i.qty)}</div>
+        </div>
+        <div class="ci-actions">
+          <button class="icon-btn" data-remove="${i.id}" data-type="${i.type}" aria-label="حذف">${K.icon('trash')}</button>
+          <div class="stepper">
+            <button data-dec="${i.id}|${i.type}" aria-label="إنقاص">−</button>
+            <span class="val num">${i.qty}</span>
+            <button data-inc="${i.id}|${i.type}" aria-label="زيادة">+</button>
+          </div>
+        </div>
+      </div>`).join('');
+    const sub = C.subtotal();
+    document.getElementById('sub').textContent = K.formatDZD(sub);
+    document.getElementById('tot').textContent = K.formatDZD(sub);
+    document.getElementById('freeNote').classList.toggle('hidden', sub >= FREE);
+  }
+  window.__onCartChange = render;
+  document.getElementById('items').addEventListener('click', e => {
+    const inc = e.target.closest('[data-inc]'), dec = e.target.closest('[data-dec]');
+    if (inc) { const [id,type] = inc.dataset.inc.split('|'); C.setQty(id, type, (C.items.find(x=>x.id===id&&x.type===type)||{}).qty + 1); }
+    if (dec) { const [id,type] = dec.dataset.dec.split('|'); C.setQty(id, type, (C.items.find(x=>x.id===id&&x.type===type)||{}).qty - 1); }
+  });
+  render();
+})();
+</script>
+</body>
+</html>

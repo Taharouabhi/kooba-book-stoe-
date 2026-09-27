@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>التصنيفات — مكتبة القبة</title>
+<meta name="description" content="تصفح كتب مكتبة القبة حسب التصنيف: روايات، تاريخ، أدب، ديني، فلسفة، شعر، علوم وأطفال.">
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="categories">
+<div id="site-header"></div>
+
+<main class="container">
+  <nav class="crumbs green" style="padding-block:22px 0" aria-label="مسار التنقل">
+    <a href="index.html">الرئيسية</a><span class="sep">/</span><span class="current" id="crumbCur">كل الكتب</span>
+  </nav>
+
+  <div class="hero-head">
+    <h1 class="page-title" id="pageTitle">كل الكتب</h1>
+    <p class="page-sub">تصفّح مجموعتنا المختارة بعناية من الكتب العربية والمترجمة، مع توصيل سريع إلى كل الولايات.</p>
+  </div>
+
+  <div class="layout-side" style="padding-block:26px 10px">
+    <aside class="sidebar" aria-label="التصفية">
+      <h3>التصنيف</h3>
+      <div id="catFilters"></div>
+      <hr class="divider">
+      <h3>السعر</h3>
+      <div id="priceFilters"></div>
+      <hr class="divider">
+      <h3>التوفر</h3>
+      <label class="filter-item"><input type="checkbox" id="inStock"><span class="check" id="stockCheck"></span> المتوفر فقط</label>
+    </aside>
+
+    <section>
+      <div class="toolbar">
+        <div class="sort">
+          <label for="sortSel">ترتيب حسب:</label>
+          <span class="select">
+            <select id="sortSel">
+              <option value="new">الأحدث أولاً</option>
+              <option value="price-asc">السعر: من الأقل للأعلى</option>
+              <option value="price-desc">السعر: من الأعلى للأقل</option>
+              <option value="rating">الأعلى تقييماً</option>
+            </select>
+            <svg class="icon"><use href="#i-chevron-down"/></svg>
+          </span>
+        </div>
+        <div class="result-count" id="resultCount"></div>
+      </div>
+      <div class="grid grid-4" id="bookGrid"></div>
+      <div class="center mt-4"><button class="btn btn-quiet" id="loadMore">تحميل المزيد</button></div>
+    </section>
+  </div>
+</main>
+
+<div id="site-footer"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+  const K = window.KBS, D = K.D, R = K.renderers;
+  const params = new URLSearchParams(location.search);
+  let activeCat = params.get('c') || '';
+  let priceBand = '';
+  let inStock = false;
+  let shown = 8;
+
+  const realCount = (id) => D.books.filter(b => b.cat === id).length;
+
+  function renderFilters(){
+    // Sidebar category filters
+    document.getElementById('catFilters').innerHTML =
+      `<label class="filter-item"><input type="radio" name="cat" value="" ${!activeCat?'checked':''}><span class="check">${K.icon('check')}</span> كل التصنيفات <span class="count">${D.books.length}</span></label>` +
+      D.categories.map(c => `
+        <label class="filter-item"><input type="radio" name="cat" value="${c.id}" ${activeCat===c.id?'checked':''}><span class="check">${K.icon('check')}</span> ${K.esc(c.name)} <span class="count">${realCount(c.id)}</span></label>`).join('');
+  }
+  renderFilters();
+
+  document.getElementById('priceFilters').innerHTML = [
+    ['', 'كل الأسعار'], ['lt1000', 'أقل من 1,000 دج'], ['1000-2000', '1,000 – 2,000 دج'], ['gt2000', 'أكثر من 2,000 دج']
+  ].map(([v,l],i) => `<label class="filter-item"><input type="radio" name="price" value="${v}" ${i===0?'checked':''}><span class="check">${K.icon('check')}</span> ${l}</label>`).join('');
+
+  function matches(b){
+    if (activeCat && b.cat !== activeCat) return false;
+    if (inStock && b.stock === 0) return false;
+    if (priceBand === 'lt1000' && !(b.price < 1000)) return false;
+    if (priceBand === '1000-2000' && !(b.price >= 1000 && b.price <= 2000)) return false;
+    if (priceBand === 'gt2000' && !(b.price > 2000)) return false;
+    return true;
+  }
+  function sortList(list){
+    const s = document.getElementById('sortSel').value;
+    const c = list.slice();
+    if (s === 'price-asc') c.sort((a,b)=>a.price-b.price);
+    else if (s === 'price-desc') c.sort((a,b)=>b.price-a.price);
+    else if (s === 'rating') c.sort((a,b)=>b.rating-a.rating);
+    else c.sort((a,b)=>(b.isNew?1:0)-(a.isNew?1:0));
+    return c;
+  }
+  function render(){
+    const list = sortList(D.books.filter(matches));
+    const cat = D.categories.find(c => c.id === activeCat);
+    document.getElementById('pageTitle').textContent = cat ? cat.name : 'كل الكتب';
+    document.getElementById('crumbCur').textContent = cat ? cat.name : 'كل الكتب';
+    document.title = (cat ? cat.name : 'التصنيفات') + ' — مكتبة القبة';
+    document.getElementById('resultCount').innerHTML =
+      `عرض <b class="num">${Math.min(shown, list.length)}</b> كتاب من أصل <b class="num">${list.length}</b>`;
+    document.getElementById('bookGrid').innerHTML = list.slice(0, shown).map(R.productCard).join('') ||
+      `<div class="state" style="grid-column:1/-1"><h1>لا توجد نتائج</h1><p>جرّب تعديل عوامل التصفية.</p></div>`;
+    document.getElementById('loadMore').classList.toggle('hidden', shown >= list.length);
+    renderFilters();
+  }
+
+  document.getElementById('catFilters').addEventListener('change', e => { activeCat = e.target.value; shown = 8; render(); });
+  document.getElementById('priceFilters').addEventListener('change', e => { priceBand = e.target.value; shown = 8; render(); });
+  document.getElementById('inStock').addEventListener('change', e => { inStock = e.target.checked; shown = 8; render(); });
+  document.getElementById('sortSel').addEventListener('change', render);
+  document.getElementById('loadMore').addEventListener('click', () => { shown += 8; render(); });
+  render();
+  KBS_API.refreshCatalog(render);
+})();
+</script>
+</body>
+</html>

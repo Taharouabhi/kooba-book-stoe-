@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الإعدادات — لوحة تحكم مكتبة القبة</title>
+<link rel="icon" href="../assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-admin="1" data-page="settings" data-title="الإعدادات">
+<div class="dash">
+  <div id="dash-side"></div>
+  <div class="dash-main">
+    <div id="dash-top"></div>
+    <div class="dash-content" id="setContent">
+      <div class="set-grid">
+        <div class="set-card">
+          <h3><svg class="icon"><use href="#i-settings"/></svg> معلومات المتجر</h3>
+          <div class="form-grid">
+            <div class="field"><label>اسم المتجر (عربي)</label><input class="input" id="sNameAr"></div>
+            <div class="field"><label>اسم المتجر (لاتيني)</label><input class="input latin" dir="ltr" id="sName"></div>
+            <div class="field full"><label>وصف المتجر</label><textarea class="textarea" id="sDesc"></textarea></div>
+            <div class="field"><label>الهاتف / واتساب</label><input class="input latin" dir="ltr" id="sPhone"></div>
+            <div class="field"><label>البريد الإلكتروني</label><input class="input latin" dir="ltr" id="sEmail"></div>
+            <div class="field full"><label>العنوان</label><input class="input" id="sAddr"></div>
+          </div>
+        </div>
+
+        <div class="set-card">
+          <h3><svg class="icon"><use href="#i-tag"/></svg> الشعار</h3>
+          <div class="logo-row">
+            <span class="logo-circle"><img src="../assets/img/logo-lg.png" alt="الشعار"></span>
+            <div>
+              <b style="font-family:var(--f-ui)">شعار المتجر الحالي</b>
+              <p class="muted" style="font-family:var(--f-ui);font-size:13px">يظهر في الترويسة والتذييل وصفحة الدخول.</p>
+            </div>
+          </div>
+          <hr class="hr">
+          <h3 class="danger"><svg class="icon" style="color:var(--red)"><use href="#i-alert"/></svg> الأمان</h3>
+          <div class="form-grid">
+            <div class="field"><label>كلمة المرور الحالية</label><input class="input latin" dir="ltr" type="password" id="sPassCur" placeholder="••••••••"></div>
+            <div class="field"><label>كلمة المرور الجديدة</label><input class="input latin" dir="ltr" type="password" id="sPassNew" placeholder="••••••••"></div>
+          </div>
+          <button class="btn btn-quiet mt-2" id="passBtn">تحديث كلمة المرور</button>
+        </div>
+
+        <div class="set-card" style="grid-column:1/-1">
+          <h3><svg class="icon"><use href="#i-truck"/></svg> مناطق التوصيل والمدد</h3>
+          <div id="shipRows"></div>
+          <button class="btn btn-quiet btn-sm mt-2" id="addShip"><svg class="icon"><use href="#i-plus"/></svg> إضافة منطقة</button>
+        </div>
+      </div>
+    </div>
+    <div class="sticky-save">
+      <button class="btn btn-ghost" id="resetBtn">تراجع</button>
+      <button class="btn btn-primary" id="saveBtn">حفظ الإعدادات</button>
+    </div>
+  </div>
+</div>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+(async function(){
+  const K = window.KBS, D = K.D, A = window.KBS_API;
+  if (!(await A.requireAdminSession())) return;
+  await A.refreshCatalog();
+
+  const $ = id => document.getElementById(id);
+  const shipRows = $('shipRows');
+
+  function fill(){
+    const s = D.settings;
+    $('sNameAr').value = s.nameAr || '';
+    $('sName').value = s.name || '';
+    $('sDesc').value = s.desc || '';
+    $('sPhone').value = s.phone || s.whatsapp || '';
+    $('sEmail').value = s.email || '';
+    $('sAddr').value = s.address || '';
+    renderShip();
+  }
+  function renderShip(){
+    const rows = D.settings.shipRows || [];
+    shipRows.innerHTML = rows.map((r, i) => `
+      <div class="ship-row" data-i="${i}">
+        <svg class="icon" style="color:var(--green-700)"><use href="#i-truck"/></svg>
+        <div style="flex:1">
+          <input class="input ship-name" value="${K.esc(r.name)}" placeholder="اسم المنطقة">
+          <div class="eta">مدة التوصيل: <input class="input ship-eta" style="width:130px;display:inline-block" value="${K.esc(r.eta)}" placeholder="24-48 ساعة"></div>
+        </div>
+        <div class="row-actions">
+          <button class="ra danger ship-del" title="حذف"><svg class="icon"><use href="#i-trash"/></svg></button>
+        </div>
+      </div>`).join('');
+  }
+  shipRows.addEventListener('click', e => {
+    const del = e.target.closest('.ship-del');
+    if (!del) return;
+    const i = +del.closest('[data-i]').dataset.i;
+    D.settings.shipRows.splice(i, 1);
+    renderShip();
+  });
+  $('addShip').addEventListener('click', () => {
+    (D.settings.shipRows = D.settings.shipRows || []).push({ name: 'منطقة جديدة', eta: '24-48 ساعة' });
+    renderShip();
+  });
+
+  fill();
+
+  $('saveBtn').addEventListener('click', async () => {
+    const s = D.settings;
+    const settings = {
+      nameAr: $('sNameAr').value.trim(),
+      name: $('sName').value.trim(),
+      desc: $('sDesc').value.trim(),
+      phone: $('sPhone').value.trim(),
+      whatsapp: $('sPhone').value.trim(),
+      email: $('sEmail').value.trim(),
+      address: $('sAddr').value.trim(),
+      adminEmail: s.adminEmail || 'admin@koubabookstore.dz',
+      shipRows: (D.settings.shipRows || []).map(r => ({ name: (r.name||'').trim(), eta: (r.eta||'').trim() })).filter(r => r.name),
+      wilayas: D.wilayas,
+      allWilayas: D.allWilayas
+    };
+    const r = await A.adminRequest('admin.settings.save', { settings });
+    K.toast(r.ok ? 'تم حفظ الإعدادات' : A.msg(r.error));
+  });
+  $('resetBtn').addEventListener('click', fill);
+
+  $('passBtn').addEventListener('click', async () => {
+    const cur = $('sPassCur').value, next = $('sPassNew').value;
+    if (!cur || !next) return K.toast('أدخل كلمة المرور الحالية والجديدة');
+    if (next.length < 10) return K.toast('كلمة المرور الجديدة يجب أن تكون 10 أحرف على الأقل');
+    const r = await A.adminRequest('admin.password.change', { current: cur, next });
+    if (r.ok) {
+      K.toast('تم تحديث كلمة المرور');
+      $('sPassCur').value = ''; $('sPassNew').value = '';
+    } else {
+      K.toast(A.msg(r.error));
+    }
+  });
+})();
+</script>
+</body>
+</html>

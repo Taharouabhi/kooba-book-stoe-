@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إدارة الكتب — لوحة تحكم مكتبة القبة</title>
+<link rel="icon" href="../assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-admin="1" data-page="books" data-title="إدارة الكتب">
+<div class="dash">
+  <div id="dash-side"></div>
+  <div class="dash-main">
+    <div id="dash-top"></div>
+    <div class="dash-content">
+      <div class="dpage-head">
+        <div>
+          <h2>الكتب</h2>
+          <p>إدارة مجموعتك من الكتب: إضافة، تعديل، وحذف.</p>
+        </div>
+        <div class="actions">
+          <div class="search-input"><svg class="icon"><use href="#i-search"/></svg><input id="q" placeholder="ابحث عن كتاب..."></div>
+          <button class="btn btn-primary" id="addBtn"><svg class="icon"><use href="#i-plus"/></svg> إضافة كتاب</button>
+        </div>
+      </div>
+
+      <div class="dcard">
+        <div class="table-scroll">
+          <table class="grid-t">
+            <thead><tr><th>الكتاب</th><th>التصنيف</th><th>السعر</th><th>المخزون</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add / edit book side panel -->
+<div class="side-panel" id="panel" role="dialog" aria-modal="true" aria-label="إضافة كتاب">
+  <div class="sp-head">
+    <h3 id="panelTitle">إضافة كتاب جديد</h3>
+    <button class="close-x" id="closePanel" aria-label="إغلاق"><svg class="icon"><use href="#i-x"/></svg></button>
+  </div>
+  <div class="sp-body">
+    <div class="form-sec">
+      <h4>غلاف الكتاب</h4>
+      <div class="flex items-center gap-2">
+        <span class="t-thumb" style="width:64px;height:88px;border-radius:8px;overflow:hidden;flex:none"><img id="coverPrev" src="../assets/img/cover-1.png" alt=""></span>
+        <span class="select-wrap" style="flex:1"><select id="fCover"></select><svg class="icon"><use href="#i-chevron-down"/></svg></span>
+      </div>
+      <p class="muted" style="font-family:var(--f-ui);font-size:13px;margin-top:8px">اختر أحد أغلفة المتجر الجاهزة لعرضه للعملاء.</p>
+    </div>
+    <div class="form-sec">
+      <h4>المعلومات الأساسية</h4>
+      <div class="form-grid">
+        <div class="field full"><label>عنوان الكتاب *</label><input class="input" id="fTitle" placeholder="مثال: الأمير الصغير"></div>
+        <div class="field"><label>المؤلف *</label><input class="input" id="fAuthor" placeholder="اسم المؤلف"></div>
+        <div class="field"><label>التصنيف</label>
+          <span class="select-wrap"><select id="fCat"></select><svg class="icon"><use href="#i-chevron-down"/></svg></span>
+        </div>
+        <div class="field"><label>السعر (دج) *</label><input class="input num" id="fPrice" type="number" placeholder="1200"></div>
+        <div class="field"><label>السعر قبل الخصم</label><input class="input num" id="fOld" type="number" placeholder="1500"></div>
+        <div class="field"><label>المخزون</label><input class="input num" id="fStock" type="number" value="10"></div>
+        <div class="field"><label>الناشر</label><input class="input" id="fPub" placeholder="دار النشر"></div>
+      </div>
+    </div>
+    <div class="form-sec">
+      <h4>الوصف</h4>
+      <div class="rte">
+        <div class="rte-toolbar">
+          <button title="عريض"><b>B</b></button><button title="مائل"><i>I</i></button><button title="قائمة">≡</button>
+        </div>
+        <textarea id="fDesc" placeholder="وصف مختصر للكتاب..."></textarea>
+      </div>
+    </div>
+    <div class="form-sec">
+      <h4>الوسوم</h4>
+      <div class="flex gap-1" style="flex-wrap:wrap">
+        <span class="chip-sel">كلاسيكي <button aria-label="إزالة"><svg class="icon"><use href="#i-x"/></svg></button></span>
+        <span class="chip-sel">رواية <button aria-label="إزالة"><svg class="icon"><use href="#i-x"/></svg></button></span>
+        <button class="btn btn-quiet btn-sm">+ وسم</button>
+      </div>
+    </div>
+  </div>
+  <div class="sp-foot">
+    <button class="btn btn-primary" id="saveBook">حفظ الكتاب</button>
+    <button class="btn btn-ghost" id="cancelBook">إلغاء</button>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+(async function(){
+  const K = window.KBS, D = K.D, A = KBS_API;
+  if (!(await A.requireAdminSession())) return;
+
+  const COVERS = Array.from({length:16}, (_,i) => 'cover-' + (i+1) + '.png');
+  const rows = document.getElementById('rows');
+  const panel = document.getElementById('panel');
+  const f = id => document.getElementById(id);
+  let editingId = null;
+  let saving = false;
+
+  function catName(id){ const c = D.categories.find(x=>x.id===id); return c ? c.name : id; }
+  function fillCatSelect(){
+    f('fCat').innerHTML = D.categories.map(c => `<option value="${c.id}">${K.esc(c.name)}</option>`).join('');
+  }
+  function render(){
+    const q = (f('q').value||'').trim();
+    const list = D.books.filter(b => !q || b.title.includes(q) || b.author.includes(q));
+    rows.innerHTML = list.map(b => `
+      <tr>
+        <td><div class="flex items-center gap-1"><span class="t-thumb"><img src="${K.u(b.coverUrl)}" alt=""></span><span class="t-title">${K.esc(b.title)}</span></div></td>
+        <td><span class="pill cat">${K.esc(catName(b.cat))}</span></td>
+        <td class="t-num">${K.formatDZD(b.price)}</td>
+        <td>${b.stock===0 ? '<span class="stock-low">نفد</span>' : (b.stock<=8 ? `<span class="stock-low">${b.stock}</span>` : `<span class="t-num">${b.stock}</span>`)}</td>
+        <td>${b.stock===0 ? '<span class="pill out">غير متوفر</span>' : '<span class="pill avail">متوفر</span>'}</td>
+        <td><div class="row-actions">
+          <button class="ra" data-edit="${b.id}" title="تعديل">${K.icon('edit')}</button>
+          <button class="ra danger" data-del="${b.id}" title="حذف">${K.icon('trash')}</button>
+        </div></td>
+      </tr>`).join('') || `<tr><td colspan="6" class="center muted" style="padding:30px">لا توجد كتب مطابقة.</td></tr>`;
+  }
+  f('q').addEventListener('input', render);
+  fillCatSelect();
+  f('fCover').innerHTML = COVERS.map(c => `<option value="${c}">${c}</option>`).join('');
+  f('fCover').addEventListener('change', () => f('coverPrev').src = K.u(D.img(f('fCover').value)));
+  render();
+
+  function open(book){
+    editingId = book ? book.id : null;
+    f('panelTitle').textContent = book ? 'تعديل الكتاب' : 'إضافة كتاب جديد';
+    f('fTitle').value = book ? book.title : '';
+    f('fAuthor').value = book ? book.author : '';
+    if (f('fCat').options.length) f('fCat').value = book && D.categories.some(c=>c.id===book.cat) ? book.cat : f('fCat').options[0].value;
+    f('fPrice').value = book ? book.price : '';
+    f('fOld').value = book && book.old ? book.old : '';
+    f('fStock').value = book ? book.stock : 10;
+    f('fPub').value = book ? (book.publisher||'') : '';
+    f('fDesc').value = book ? (book.desc||'') : '';
+    const cov = book && COVERS.includes(book.cover) ? book.cover : COVERS[0];
+    f('fCover').value = cov;
+    f('coverPrev').src = K.u(D.img(cov));
+    panel.classList.add('open');
+  }
+  f('addBtn').addEventListener('click', () => open(null));
+  f('closePanel').addEventListener('click', () => panel.classList.remove('open'));
+  f('cancelBook').addEventListener('click', () => panel.classList.remove('open'));
+
+  async function reload(){
+    await A.refreshCatalog();
+    fillCatSelect();
+    render();
+  }
+
+  f('saveBook').addEventListener('click', async () => {
+    if (saving) return;
+    const title = f('fTitle').value.trim(), author = f('fAuthor').value.trim();
+    const price = parseInt(f('fPrice').value, 10), stock = parseInt(f('fStock').value, 10);
+    if (!title || !author || !Number.isFinite(price) || price < 0 || !Number.isFinite(stock) || stock < 0) {
+      K.toast('أكمل العنوان والمؤلف والسعر والمخزون أولاً'); return;
+    }
+    const existing = editingId ? D.books.find(b => b.id === editingId) : null;
+    const oldVal = parseInt(f('fOld').value, 10);
+    const book = Object.assign({}, existing || {}, {
+      id: existing ? existing.id : 'b-' + Date.now().toString(36),
+      title, author,
+      cat: f('fCat').value || 'thaqafa',
+      price, stock,
+      old: Number.isFinite(oldVal) && oldVal > 0 ? oldVal : undefined,
+      publisher: f('fPub').value.trim(),
+      desc: f('fDesc').value.trim(),
+      cover: f('fCover').value,
+    });
+    if (!book.catLabel) book.catLabel = catName(book.cat);
+    saving = true;
+    f('saveBook').disabled = true;
+    const r = await A.adminRequest('admin.books.save', { book });
+    saving = false;
+    f('saveBook').disabled = false;
+    if (!r.ok) { K.toast(A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r.error)); return; }
+    panel.classList.remove('open');
+    K.toast(existing ? 'تم تحديث الكتاب' : 'تمت إضافة الكتاب');
+    reload();
+  });
+
+  rows.addEventListener('click', async e => {
+    const ed = e.target.closest('[data-edit]');
+    if (ed) { open(D.books.find(b => b.id === ed.dataset.edit)); return; }
+    const del = e.target.closest('[data-del]');
+    if (!del) return;
+    const b = D.books.find(x => x.id === del.dataset.del);
+    if (!b || !confirm('حذف "' + b.title + '" نهائياً؟')) return;
+    const r = await A.adminRequest('admin.books.delete', { id: b.id });
+    if (!r.ok) { K.toast(A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r.error)); return; }
+    K.toast('تم حذف الكتاب');
+    reload();
+  });
+})();
+</script>
+</body>
+</html>

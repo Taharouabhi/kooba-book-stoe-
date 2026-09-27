@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>تم استلام طلبك — مكتبة القبة</title>
+<meta name="description" content="تأكيد استلام الطلب من مكتبة القبة.">
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="">
+<div id="site-header"></div>
+
+<main class="container">
+  <div class="state" style="padding-block:90px">
+    <div class="success-check"><svg class="icon"><use href="#i-check"/></svg></div>
+    <span class="order-chip num" id="ref">KB-0000</span>
+    <h1>شكراً لك! تم استلام طلبك</h1>
+    <p id="msg">سيتواصل معك فريقنا هاتفياً خلال 24 ساعة لتأكيد الطلب وموعد التوصيل.</p>
+    <div class="success-actions">
+      <a class="btn btn-primary" href="category.html">متابعة التسوق</a>
+      <a class="btn btn-quiet" href="index.html">العودة للرئيسية</a>
+    </div>
+  </div>
+</main>
+
+<div id="site-footer"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+  const K = window.KBS;
+  let o = null;
+  try { o = JSON.parse(sessionStorage.getItem('kbs_last_order')); } catch(e){}
+  if (!o) { location.replace('index.html'); return; }
+  document.getElementById('ref').textContent = o.ref;
+  const n = (o.items||[]).reduce((s,i)=>s+i.qty,0);
+  document.getElementById('msg').textContent =
+    `عزيزنا ${o.name}، تم تسجيل طلبك رقم ${o.ref} (${n} عنصر) بقيمة ${K.formatDZD(o.total)}. سيتواصل معك فريقنا هاتفياً خلال 24 ساعة لتأكيد الطلب وموعد التوصيل.`;
+})();
+</script>
+</body>
+</html>

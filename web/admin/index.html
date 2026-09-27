@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نظرة عامة — لوحة تحكم مكتبة القبة</title>
+<link rel="icon" href="../assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-admin="1" data-page="overview" data-title="نظرة عامة">
+<div class="dash">
+  <div id="dash-side"></div>
+  <div class="dash-main">
+    <div id="dash-top"></div>
+    <div class="dash-content">
+      <div class="stats" id="stats"></div>
+
+      <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px" class="ov-grid">
+        <div class="chart-card">
+          <div class="chart-head">
+            <h3>مبيعات آخر 7 أيام</h3>
+            <span class="pill done"><span class="dot"></span> مباشر</span>
+          </div>
+          <div class="bars" id="bars"></div>
+        </div>
+        <div class="dcard">
+          <div class="dcard-head"><h3>كتب قاربت على النفاد</h3></div>
+          <div class="table-scroll">
+            <table class="grid-t">
+              <thead><tr><th>الكتاب</th><th>المخزون</th><th></th></tr></thead>
+              <tbody id="lowStock"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="dcard mt-3">
+        <div class="dcard-head">
+          <h3>أحدث الطلبات</h3>
+          <a class="btn btn-quiet btn-sm" href="orders.html">عرض الكل</a>
+        </div>
+        <div class="table-scroll">
+          <table class="grid-t">
+            <thead><tr><th>رقم الطلب</th><th>العميل</th><th>المبلغ</th><th>الحالة</th><th></th></tr></thead>
+            <tbody id="recent"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>@media(max-width:900px){.ov-grid{grid-template-columns:1fr}}</style>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+(async function(){
+  const K = window.KBS, D = K.D;
+  if (!(await KBS_API.requireAdminSession())) return;
+  const A = KBS_API;
+
+  function pill(s){
+    const map = { new:['جديد','new'], proc:['قيد المعالجة','proc'], done:['مكتمل','done'], cancel:['ملغي','cancel'] };
+    const [label, cls] = map[s] || ['جديد','new'];
+    return `<span class="pill ${cls}"><span class="dot"></span>${label}</span>`;
+  }
+
+  const r = await A.adminRequest('admin.stats');
+  if (!r.ok) {
+    document.querySelector('.dash-content').innerHTML =
+      `<div class="dcard" style="padding:40px;text-align:center"><h3 style="margin-bottom:8px">تعذّر تحميل البيانات</h3>
+      <p class="muted">${A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حدّث الصفحة للمحاولة مرة أخرى.' : 'انتهت الجلسة، أعد تسجيل الدخول.'}</p></div>`;
+    return;
+  }
+  const s = r.data;
+
+  const statCards = [
+    { label:'مبيعات هذا الشهر', value:K.formatDZD(s.salesMonth), icon:'chart', tone:'g' },
+    { label:'طلبات جديدة', value:K.num(s.counts.new), icon:'cart', tone:'b' },
+    { label:'كتب قاربت على النفاد', value:K.num(s.lowStockCount), icon:'alert', tone:'r', danger:s.lowStockCount > 0 },
+    { label:'عدد الكتب', value:K.num(s.booksCount), icon:'book', tone:'g' },
+  ];
+  document.getElementById('stats').innerHTML = statCards.map(c => `
+    <div class="stat">
+      <span class="ic ${c.tone}">${K.icon(c.icon)}</span>
+      <div><div class="v num ${c.danger?'danger':''}">${c.value}</div><div class="l">${K.esc(c.label)}</div></div>
+    </div>`).join('');
+
+  const max = Math.max(1, ...s.chart.map(d => d.total));
+  document.getElementById('bars').innerHTML = s.chart.map(d => {
+    const day = new Date(d.date + 'T00:00:00').toLocaleDateString('ar', { weekday:'short' });
+    return `
+    <div class="bar-col">
+      <span class="bar-tip num">${K.formatDZD(d.total)}</span>
+      <div class="bar" style="height:${Math.max(3, Math.round(d.total/max*100))}%"></div>
+      <span class="lbl">${day}</span>
+    </div>`;
+  }).join('');
+
+  document.getElementById('lowStock').innerHTML = s.lowStock.map(b => `
+    <tr>
+      <td><div class="flex items-center gap-1"><span class="t-thumb"><img src="${K.u(D.img(b.cover))}" alt=""></span><span class="t-title">${K.esc(b.title)}</span></div></td>
+      <td><span class="${b.stock===0?'stock-low':'t-num'}">${b.stock===0?'نفد':b.stock+' متبقي'}</span></td>
+      <td><div class="row-actions"><a class="ra" href="books.html" title="تعديل">${K.icon('edit')}</a></div></td>
+    </tr>`).join('') || `<tr><td colspan="3" class="muted" style="padding:18px;text-align:center">المخزون في حالة جيدة</td></tr>`;
+
+  document.getElementById('recent').innerHTML = s.recent.map(o => `
+    <tr>
+      <td class="t-num latin" dir="ltr">${K.esc(o.ref)}</td>
+      <td>${K.esc(o.name)}</td>
+      <td class="t-num">${K.formatDZD(o.total)}</td>
+      <td>${pill(o.status)}</td>
+      <td><div class="row-actions"><a class="ra" href="orders.html" title="عرض">${K.icon('eye')}</a></div></td>
+    </tr>`).join('') || `<tr><td colspan="5" class="muted" style="padding:18px;text-align:center">لا توجد طلبات بعد</td></tr>`;
+})();
+</script>
+</body>
+</html>

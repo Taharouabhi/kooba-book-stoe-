@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إدارة الطلبات — لوحة تحكم مكتبة القبة</title>
+<link rel="icon" href="../assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-admin="1" data-page="orders" data-title="إدارة الطلبات">
+<div class="dash">
+  <div id="dash-side"></div>
+  <div class="dash-main">
+    <div id="dash-top"></div>
+    <div class="dash-content">
+      <div class="dpage-head">
+        <div>
+          <h2>الطلبات</h2>
+          <p>تابع طلبات العملاء وحدّث حالتها من مكان واحد.</p>
+        </div>
+        <div class="actions">
+          <div class="search-input"><svg class="icon"><use href="#i-search"/></svg><input id="q" placeholder="ابحث برقم الطلب أو الاسم..."></div>
+        </div>
+      </div>
+
+      <div class="ftabs" id="ftabs"></div>
+
+      <div class="dcard">
+        <div class="table-scroll">
+          <table class="grid-t">
+            <thead><tr><th>رقم الطلب</th><th>العميل</th><th>الهاتف</th><th>الولاية</th><th>المبلغ</th><th>الحالة</th><th>التاريخ</th><th>إجراءات</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Order details modal -->
+<div class="overlay" id="odModal" role="dialog" aria-modal="true" aria-label="تفاصيل الطلب">
+  <div class="modal" style="max-width:760px">
+    <div class="modal-head">
+      <h3 id="odRef">تفاصيل الطلب</h3>
+      <button class="close-x" data-close aria-label="إغلاق"><svg class="icon"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="modal-body" id="odBody" style="max-height:70vh"></div>
+    <div class="modal-foot" style="flex-direction:row;align-items:center;justify-content:space-between">
+      <div class="flex items-center gap-1">
+        <label for="odStatus" style="font-family:var(--f-ui);font-size:14px">حالة الطلب:</label>
+        <span class="select-wrap"><select id="odStatus">
+          <option value="new">جديد</option><option value="proc">قيد المعالجة</option>
+          <option value="done">مكتمل</option><option value="cancel">ملغي</option>
+        </select><svg class="icon"><use href="#i-chevron-down"/></svg></span>
+      </div>
+      <button class="btn btn-primary" id="odSave">حفظ التغييرات</button>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/api.js"></script>
+<script>
+(async function(){
+  const K = window.KBS, D = K.D, A = KBS_API;
+  if (!(await A.requireAdminSession())) return;
+
+  const LABEL = { all:'الكل', new:'جديد', proc:'قيد المعالجة', done:'مكتمل', cancel:'ملغي' };
+  const PAY = { cod:'الدفع عند الاستلام', ccp:'تحويل بريدي (CCP)' };
+  const DEL = { home:'توصيل للمنزل', office:'مكتب الشركة' };
+  let tab = 'all';
+  let orders = [];
+
+  const r = await A.adminRequest('admin.orders');
+  if (!r.ok) {
+    document.getElementById('rows').innerHTML =
+      `<tr><td colspan="8" class="center muted" style="padding:30px">${A.isOutcomeUnknown(r) ? 'تعذّر تحميل الطلبات، حدّث الصفحة للمحاولة مرة أخرى.' : 'انتهت الجلسة، أعد تسجيل الدخول.'}</td></tr>`;
+    document.getElementById('ftabs').innerHTML = '';
+    return;
+  }
+  orders = r.data.orders || [];
+
+  const fmtDate = iso => {
+    const d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleDateString('ar-DZ') + ' ' + d.toLocaleTimeString('ar-DZ', { hour:'2-digit', minute:'2-digit' });
+  };
+  const itemCover = it => {
+    const src = it.type === 'bundle' ? D.bundles : D.books;
+    const found = src.find(x => x.id === it.id);
+    return found ? found.cover : null;
+  };
+
+  function tabs(){
+    const counts = { all: orders.length };
+    orders.forEach(o => counts[o.status] = (counts[o.status]||0)+1);
+    document.getElementById('ftabs').innerHTML = Object.keys(LABEL).map(k =>
+      `<button class="ftab ${tab===k?'active':''}" data-tab="${k}">${LABEL[k]}<span class="n num">${counts[k]||0}</span></button>`).join('');
+  }
+  function render(){
+    const q = (document.getElementById('q').value||'').trim();
+    const list = orders.filter(o => (tab==='all'||o.status===tab) &&
+      (!q || o.ref.includes(q) || (o.name||'').includes(q) || (o.phone||'').includes(q)));
+    document.getElementById('rows').innerHTML = list.map(o => `
+      <tr>
+        <td class="t-num latin" dir="ltr">${K.esc(o.ref)}</td>
+        <td>${K.esc(o.name)}</td>
+        <td class="t-num latin" dir="ltr">${K.esc(o.phone)}</td>
+        <td>${K.esc(o.wilaya)}</td>
+        <td class="t-num">${K.formatDZD(o.total)}</td>
+        <td><span class="pill ${o.status}"><span class="dot"></span>${LABEL[o.status]}</span></td>
+        <td class="t-num">${fmtDate(o.createdAt)}</td>
+        <td><div class="row-actions">
+          <button class="ra" data-view="${o.id}" title="عرض التفاصيل">${K.icon('eye')}</button>
+        </div></td>
+      </tr>`).join('') || `<tr><td colspan="8" class="center muted" style="padding:30px">لا توجد طلبات مطابقة.</td></tr>`;
+  }
+  tabs(); render();
+  document.getElementById('ftabs').addEventListener('click', e => {
+    const t = e.target.closest('[data-tab]'); if (!t) return;
+    tab = t.dataset.tab; tabs(); render();
+  });
+  document.getElementById('q').addEventListener('input', render);
+
+  const modal = document.getElementById('odModal');
+  modal.addEventListener('click', e => { if (e.target === modal || e.target.closest('[data-close]')) modal.classList.remove('open'); });
+
+  let currentOrder = null;
+  document.getElementById('rows').addEventListener('click', e => {
+    const v = e.target.closest('[data-view]'); if (!v) return;
+    const o = orders.find(x => x.id === v.dataset.view); if (!o) return;
+    currentOrder = o;
+    document.getElementById('odRef').textContent = 'تفاصيل الطلب ' + o.ref;
+    document.getElementById('odStatus').value = o.status;
+    document.getElementById('odBody').innerHTML = `
+      <div class="flex items-center gap-2" style="justify-content:space-between;flex-wrap:wrap">
+        <span class="pill ${o.status}"><span class="dot"></span>${LABEL[o.status]}</span>
+        <span class="muted" style="font-family:var(--f-ui);font-size:14px">${fmtDate(o.createdAt)}</span>
+      </div>
+      <hr class="divider">
+      <div class="kv">
+        <div><div class="k">العميل</div><div class="v">${K.esc(o.name)}</div></div>
+        <div><div class="k">الهاتف</div><div class="v num latin" dir="ltr">${K.esc(o.phone)}</div></div>
+        <div><div class="k">الولاية / البلدية</div><div class="v">${K.esc(o.wilaya)} — ${K.esc(o.city)}</div></div>
+        <div><div class="k">التوصيل / الدفع</div><div class="v">${DEL[o.delivery]||''} · ${PAY[o.payment]||''}</div></div>
+        <div style="grid-column:1/-1"><div class="k">العنوان</div><div class="v">${K.esc(o.address)}</div></div>
+      </div>
+      <hr class="divider">
+      <table class="grid-t">
+        <thead><tr><th>المنتج</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead>
+        <tbody>${o.items.map(i => {
+          const cov = itemCover(i);
+          return `
+          <tr>
+            <td><div class="flex items-center gap-1">${cov ? `<span class="t-thumb"><img src="${K.u(D.img(cov))}" alt=""></span>` : ''}
+              <div><div class="t-title">${K.esc(i.title)}</div><div class="muted" style="font-size:13px">${i.type === 'bundle' ? 'باقة كتب' : 'كتاب'}</div></div></div></td>
+            <td class="t-num">${i.qty}</td><td class="t-num">${K.formatDZD(i.price)}</td><td class="t-num">${K.formatDZD(i.sub)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+      ${o.note ? `<div class="note-box"><div class="k">ملاحظة العميل</div><div class="v">${K.esc(o.note)}</div></div>` : ''}
+      <div class="sum-row"><span>المجموع الفرعي</span><span class="v">${K.formatDZD(o.subtotal)}</span></div>
+      <div class="sum-row"><span>التوصيل</span><span class="v">${o.shipping === 0 ? 'مجاني' : K.formatDZD(o.shipping)}</span></div>
+      <div class="sum-row total"><span>الإجمالي</span><span class="v">${K.formatDZD(o.total)}</span></div>`;
+    modal.classList.add('open');
+  });
+
+  const saveBtn = document.getElementById('odSave');
+  saveBtn.addEventListener('click', async () => {
+    if (!currentOrder) return;
+    const status = document.getElementById('odStatus').value;
+    saveBtn.disabled = true;
+    const r2 = await A.adminRequest('admin.order.setStatus', { id: currentOrder.id, status });
+    saveBtn.disabled = false;
+    if (!r2.ok) { K.toast(A.isOutcomeUnknown(r2) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r2.error)); return; }
+    currentOrder.status = r2.data.status;
+    tabs(); render();
+    modal.classList.remove('open');
+    K.toast('تم تحديث حالة الطلب ' + currentOrder.ref);
+  });
+})();
+</script>
+</body>
+</html>

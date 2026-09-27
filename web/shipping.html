@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>التوصيل والأسعار — مكتبة القبة</title>
+<meta name="description" content="أسعار التوصيل إلى كل الولايات ومدة التوصيل من مكتبة القبة.">
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="shipping">
+<div id="site-header"></div>
+
+<main class="container">
+  <div class="hero-head">
+    <h1 class="page-title">التوصيل والأسعار</h1>
+    <p class="page-sub">نوصّل طلباتك إلى كل ولايات الوطن عبر شركاء موثوقين. التوصيل مجاني للطلبات التي تتجاوز 3,000 دج.</p>
+  </div>
+
+  <section class="section">
+    <div class="table-card">
+      <table class="data">
+        <thead><tr><th>الولاية</th><th>التوصيل للمنزل</th><th>مكتب الشركة</th><th>مدة التوصيل</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="notice mt-3" style="max-width:640px"><svg class="icon"><use href="#i-alert"/></svg> بقية الولايات تُحسب حسب أقرب مكتب شحن، ويؤكد الفريق السعر هاتفياً قبل الإرسال.</div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2 class="section-title">طرق الدفع المتاحة</h2></div>
+    <div class="grid grid-3">
+      <div class="assure"><span class="ic"><svg class="icon"><use href="#i-shield"/></svg></span><div><b>الدفع عند الاستلام</b><span>ادفع نقداً عند استلام طلبك من الموزّع.</span></div></div>
+      <div class="assure"><span class="ic"><svg class="icon"><use href="#i-landmark"/></svg></span><div><b>تحويل بريدي CCP</b><span>حوّل المبلغ ثم أرسل الوصل لتأكيد الطلب.</span></div></div>
+      <div class="assure"><span class="ic"><svg class="icon"><use href="#i-refresh"/></svg></span><div><b>إرجاع مجاني</b><span>يمكنك إرجاع الكتاب خلال 7 أيام بحالته الأصلية.</span></div></div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+  const K = window.KBS, D = K.D;
+  function render(){
+    document.getElementById('rows').innerHTML = D.wilayas.map(w => `
+      <tr>
+        <td class="wilaya${w.capital?' cap':''}">${K.esc(w.name)}${w.capital?' (العاصمة)':''}</td>
+        <td class="home num">${K.formatDZD(w.home)}</td>
+        <td class="office num">${K.formatDZD(w.office)}</td>
+        <td class="num">${w.capital ? '24 - 48 ساعة' : '3 - 5 أيام'}</td>
+      </tr>`).join('');
+  }
+  render();
+  KBS_API.refreshCatalog(render);
+})();
+</script>
+</body>
+</html>

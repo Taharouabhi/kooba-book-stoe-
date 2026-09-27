@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>نتائج البحث — مكتبة القبة</title>
+<meta name="description" content="نتائج البحث في متجر مكتبة القبة.">
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="">
+<div id="site-header"></div>
+
+<main class="container">
+  <div class="hero-head">
+    <h1 class="page-title" id="title">نتائج البحث</h1>
+    <p class="page-sub" id="sub"></p>
+  </div>
+  <section class="section">
+    <div class="grid grid-4" id="grid"></div>
+    <div id="empty" class="hidden">
+      <div class="state">
+        <div class="state-illus"><img src="assets/img/empty-cart.png" alt=""></div>
+        <h1>لا توجد نتائج مطابقة</h1>
+        <p>حاول البحث بكلمات مختلفة أو تصفح التصنيفات</p>
+        <div class="success-actions">
+          <a class="btn btn-primary" href="category.html">تصفح التصنيفات</a>
+          <a class="btn btn-quiet" href="index.html">العودة للرئيسية</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="site-footer"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+  const K = window.KBS, D = K.D, R = K.renderers;
+  const q = (new URLSearchParams(location.search).get('q') || '').trim();
+  const norm = s => (s||'').toLowerCase();
+  function render(){
+    const list = q ? D.books.filter(b =>
+        norm(b.title).includes(norm(q)) || norm(b.author).includes(norm(q)) ||
+        (b.tags||[]).some(t => norm(t).includes(norm(q))) || norm(b.catLabel).includes(norm(q))
+      ) : D.books;
+    document.getElementById('title').textContent = q ? `نتائج البحث عن: "${q}"` : 'كل الكتب';
+    document.getElementById('sub').textContent = q ? `${list.length} نتيجة مطابقة` : 'تصفح كامل مجموعتنا من الكتب.';
+    document.getElementById('grid').innerHTML = list.map(R.productCard).join('');
+    document.getElementById('empty').classList.toggle('hidden', list.length > 0);
+  }
+  render();
+  KBS_API.refreshCatalog(render);
+})();
+</script>
+</body>
+</html>

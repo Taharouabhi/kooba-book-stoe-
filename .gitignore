@@ -1,0 +1,21 @@
+# Qoder local preview descriptor
+.Kouba Book Store.qoder.site
+
+# Raw Figma API scratch dumps (design source is the Figma file itself)
+figma_file.json
+node_home.json
+nodes_b*.json
+image_refs.json
+urls*.json
+
+# Build-process screenshots and helpers
+shots/
+shot.sh
+
+# Raw design image exports (used images live in web/assets/img/)
+figma_exports/
+
+# OS junk
+Thumbs.db
+.DS_Store
+node_modules/

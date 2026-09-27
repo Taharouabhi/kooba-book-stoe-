@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>إتمام الطلب — مكتبة القبة</title>
+<meta name="description" content="إتمام طلبك من مكتبة القبة: معلومات التوصيل وطريقة الدفع.">
+<link rel="icon" href="assets/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Noto+Naskh+Arabic:wght@400;700&family=Tajawal:wght@400;500;700&family=Cairo:wght@400;600;700&family=Be+Vietnam+Pro:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="">
+<div id="site-header"></div>
+
+<main class="container">
+  <nav class="crumbs green" style="padding-block:22px 0" aria-label="مسار التنقل">
+    <a href="index.html">الرئيسية</a><span class="sep">/</span>
+    <a href="cart.html">سلّة التسوق</a><span class="sep">/</span>
+    <span class="current">إتمام الطلب</span>
+  </nav>
+  <div class="hero-head"><h1 class="page-title">إتمام الطلب</h1></div>
+
+  <form class="cart-layout" id="coForm" style="padding-block:26px" novalidate>
+    <section class="panel">
+      <h2 class="panel-title">معلومات التوصيل</h2>
+      <div class="form-grid">
+        <div class="field"><label for="fname">الاسم الكامل *</label><input class="input" id="fname" name="name" required placeholder="مثال: أحمد بن صالح"></div>
+        <div class="field"><label for="fphone">رقم الهاتف *</label><input class="input latin" dir="ltr" id="fphone" name="phone" required placeholder="0555 12 34 56"></div>
+        <div class="field"><label for="fwilaya">الولاية *</label>
+          <span class="select-wrap">
+            <select id="fwilaya" name="wilaya" required></select>
+            <svg class="icon"><use href="#i-chevron-down"/></svg>
+          </span>
+        </div>
+        <div class="field"><label for="fcity">البلدية / المدينة *</label><input class="input" id="fcity" name="city" required placeholder="مثال: القبة"></div>
+        <div class="field full"><label for="faddr">العنوان الكامل *</label><textarea class="textarea" id="faddr" name="address" required placeholder="الحي، الشارع، رقم العمارة..."></textarea></div>
+        <div class="field full"><label for="fnote">ملاحظات (اختياري)</label><textarea class="textarea" id="fnote" name="note" placeholder="مثال: الرجاء التوصيل بعد الساعة 4 مساءً"></textarea></div>
+      </div>
+
+      <h2 class="panel-title mt-4">طريقة التوصيل</h2>
+      <div class="radio-cards">
+        <label class="radio-card"><input type="radio" name="delivery" value="home" checked><span class="radio-dot"></span><span><b>توصيل للمنزل</b><span id="homePrice">—</span></span></label>
+        <label class="radio-card"><input type="radio" name="delivery" value="office"><span class="radio-dot"></span><span><b>مكتب الشركة</b><span id="officePrice">—</span></span></label>
+      </div>
+
+      <h2 class="panel-title mt-4">طريقة الدفع</h2>
+      <div class="radio-cards">
+        <label class="radio-card"><input type="radio" name="payment" value="cod" checked><span class="radio-dot"></span><span><b>الدفع عند الاستلام</b><span>ادفع نقداً عند استلام طلبك</span></span></label>
+        <label class="radio-card"><input type="radio" name="payment" value="ccp"><span class="radio-dot"></span><span><b>تحويل بريدي (CCP)</b><span>يُؤكد الطلب بعد التحقق من التحويل</span></span></label>
+      </div>
+    </section>
+
+    <aside class="panel panel-alt summary">
+      <h2 class="panel-title">ملخص الطلب</h2>
+      <div id="mini"></div>
+      <hr class="divider">
+      <div class="sum-row"><span>المجموع الفرعي</span><span class="v" id="sub">0 د.ج</span></div>
+      <div class="sum-row"><span>التوصيل</span><span class="v" id="ship">0 د.ج</span></div>
+      <div class="sum-row total"><span>الإجمالي</span><span class="v" id="tot">0 د.ج</span></div>
+      <button class="order-btn" type="submit"><span>تأكيد الطلب</span><span class="pill num" id="pillCount">0</span></button>
+      <p class="muted mt-2" style="font-family:var(--f-ui);font-size:13px">بالضغط على تأكيد الطلب أنت توافق على شروط البيع وسياسة الإرجاع.</p>
+    </aside>
+  </form>
+</main>
+
+<div id="site-footer"></div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/api.js"></script>
+<script>
+(function(){
+  const K = window.KBS, D = K.D, C = K.Cart;
+  const FREE = 3000;
+  if (!C.items.length) location.replace('cart.html');
+
+  const wSel = document.getElementById('fwilaya');
+  function fillWilayas(){
+    const cur = wSel.value || 'الجزائر';
+    wSel.innerHTML = '<option value="">اختر الولاية…</option>' + D.allWilayas.map(w => `<option>${w}</option>`).join('');
+    wSel.value = D.allWilayas.includes(cur) ? cur : '';
+  }
+  fillWilayas();
+
+  function rate(){
+    const name = wSel.value;
+    const w = D.wilayas.find(x => x.name === name);
+    const home = w ? w.home : 800, office = w ? w.office : 520;
+    document.getElementById('homePrice').textContent = K.formatDZD(home) + ' · 24-72 ساعة';
+    document.getElementById('officePrice').textContent = K.formatDZD(office) + ' · 24-72 ساعة';
+    const mode = document.querySelector('input[name=delivery]:checked').value;
+    const base = mode === 'home' ? home : office;
+    return C.subtotal() >= FREE ? 0 : base;
+  }
+  function render(){
+    document.getElementById('mini').innerHTML = C.items.map(i => `
+      <div class="mini-item">
+        <span class="thumb"><img src="${i.cover}" alt=""></span>
+        <div class="ci-info"><div class="ci-title" style="font-size:15px">${K.esc(i.title)}</div><div class="ci-meta">${i.qty} × ${K.formatDZD(i.price)}</div></div>
+        <span class="ci-price" style="margin:0">${K.formatDZD(i.qty*i.price)}</span>
+      </div>`).join('');
+    const sh = rate();
+    document.getElementById('sub').textContent = K.formatDZD(C.subtotal());
+    document.getElementById('ship').textContent = sh === 0 ? 'مجاني' : K.formatDZD(sh);
+    document.getElementById('tot').textContent = K.formatDZD(C.subtotal() + sh);
+    document.getElementById('pillCount').textContent = C.count();
+    fillWilayas();
+  }
+  wSel.addEventListener('change', render);
+  document.querySelectorAll('input[name=delivery]').forEach(r => r.addEventListener('change', render));
+  render();
+  KBS_API.refreshCatalog(render);
+
+  const orderBtn = document.querySelector('.order-btn');
+  document.getElementById('coForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const f = e.target;
+    if (!C.items.length) { location.replace('cart.html'); return; }
+    if (!f.reportValidity()) return;
+    if (orderBtn.disabled) return;
+    orderBtn.disabled = true;
+
+    const r = await KBS_API.createOrder({
+      name: f.elements['name'].value.trim(),
+      phone: f.elements['phone'].value.trim(),
+      wilaya: wSel.value,
+      city: f.elements['city'].value.trim(),
+      address: f.elements['address'].value.trim(),
+      note: f.elements['note'].value.trim(),
+      delivery: document.querySelector('input[name=delivery]:checked').value,
+      payment: document.querySelector('input[name=payment]:checked').value,
+      items: C.items.map(i => ({ id: i.id, type: i.type, qty: i.qty }))
+    });
+
+    if (r.ok && r.data && r.data.order) {
+      sessionStorage.setItem('kbs_last_order', JSON.stringify({
+        ref: r.data.order.ref,
+        name: r.data.order.name,
+        total: r.data.order.total,
+        items: r.data.order.items.map(i => ({ title: i.title, qty: i.qty }))
+      }));
+      C.clear();
+      location.href = 'success.html';
+      return;
+    }
+
+    if (KBS_API.isOutcomeUnknown(r)) {
+      // The order may or may not have been registered — never resubmit automatically.
+      K.toast('تعذّر التأكد من تسجيل الطلب. سنتواصل معك هاتفياً لتأكيده — لا تُعيد المحاولة الآن.');
+      return;
+    }
+    K.toast(KBS_API.msg(r.error));
+    orderBtn.disabled = false;
+  });
+})();
+</script>
+</body>
+</html>
