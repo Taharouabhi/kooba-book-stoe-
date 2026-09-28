@@ -1,0 +1,15 @@
+{
+  "name": "kouba-book-store",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Kouba Book Store (مكتبة القبة) — storefront, admin dashboard, and self-hostable backend",
+  "scripts": {
+    "start": "node server/server.mjs",
+    "import-dump": "node db/import-dump.mjs",
+    "local-preview": "node dev/local-server.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

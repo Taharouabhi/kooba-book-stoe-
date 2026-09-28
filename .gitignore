@@ -15,6 +15,12 @@ shot.sh
 # Raw design image exports (used images live in web/assets/img/)
 figma_exports/
 
+# Database dump — contains customer personal details, keep local only
+db-dump/
+
+# Local env files with secrets
+.env
+
 # OS junk
 Thumbs.db
 .DS_Store

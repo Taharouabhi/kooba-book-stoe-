@@ -76,3 +76,9 @@ for example: "change the price of the book of the month to 2000" or
 - The dashboard (`/admin/login.html`) is protected by a real password —
   keep it private.
 - The site is public: anyone with the link can browse and order.
+
+## Self-hosting (optional)
+
+The whole store can also run on your own server with your own domain —
+`server/` is the standalone server, `db/import-dump.mjs` loads the data
+export, and **`SELF-HOSTING.md` is the full step-by-step guide**.
