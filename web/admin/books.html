@@ -52,7 +52,12 @@
         <span class="t-thumb" style="width:64px;height:88px;border-radius:8px;overflow:hidden;flex:none"><img id="coverPrev" src="../assets/img/cover-1.png" alt=""></span>
         <span class="select-wrap" style="flex:1"><select id="fCover"></select><svg class="icon"><use href="#i-chevron-down"/></svg></span>
       </div>
-      <p class="muted" style="font-family:var(--f-ui);font-size:13px;margin-top:8px">اختر أحد أغلفة المتجر الجاهزة لعرضه للعملاء.</p>
+      <div class="flex items-center gap-2" style="margin-top:8px">
+        <input type="file" id="coverFile" accept="image/png,image/jpeg,image/webp" hidden>
+        <button class="btn btn-quiet btn-sm" id="uploadCover" type="button"><svg class="icon"><use href="#i-upload"/></svg> رفع غلاف من جهازك</button>
+        <span class="muted" id="uploadHint" style="font-family:var(--f-ui);font-size:12px"></span>
+      </div>
+      <p class="muted" style="font-family:var(--f-ui);font-size:13px;margin-top:8px">اختر أحد الأغلفة الجاهزة من القائمة، أو ارفع صورة من جهازك (PNG أو JPG أو WebP) — تُصغَّر تلقائياً وتُحفظ على الخادم.</p>
     </div>
     <div class="form-sec">
       <h4>المعلومات الأساسية</h4>
@@ -100,16 +105,33 @@
   const K = window.KBS, D = K.D, A = KBS_API;
   if (!(await A.requireAdminSession())) return;
 
-  const COVERS = Array.from({length:16}, (_,i) => 'cover-' + (i+1) + '.png');
+  const COVERS_DEFAULT = Array.from({length:16}, (_,i) => 'cover-' + (i+1) + '.png');
+  let covers = COVERS_DEFAULT.slice();
   const rows = document.getElementById('rows');
   const panel = document.getElementById('panel');
   const f = id => document.getElementById(id);
   let editingId = null;
   let saving = false;
+  let uploading = false;
 
   function catName(id){ const c = D.categories.find(x=>x.id===id); return c ? c.name : id; }
   function fillCatSelect(){
     f('fCat').innerHTML = D.categories.map(c => `<option value="${c.id}">${K.esc(c.name)}</option>`).join('');
+  }
+  // Rebuild the cover dropdown from the live image list. The currently
+  // selected name is always kept (even if the list hasn't loaded yet) so
+  // editing a book never silently swaps its cover.
+  function fillCoverSelect(keep){
+    const sel = f('fCover');
+    const list = keep && !covers.includes(keep) ? [keep, ...covers] : covers.slice();
+    sel.innerHTML = list.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.value = keep && list.includes(keep) ? keep : list[0];
+    f('coverPrev').src = K.u(D.img(sel.value));
+  }
+  async function loadCovers(){
+    const r = await A.listImages();
+    if (r.ok && Array.isArray(r.data.images) && r.data.images.length) covers = r.data.images;
+    fillCoverSelect(f('fCover').value);
   }
   function render(){
     const q = (f('q').value||'').trim();
@@ -129,7 +151,8 @@
   }
   f('q').addEventListener('input', render);
   fillCatSelect();
-  f('fCover').innerHTML = COVERS.map(c => `<option value="${c}">${c}</option>`).join('');
+  fillCoverSelect(null);
+  loadCovers();
   f('fCover').addEventListener('change', () => f('coverPrev').src = K.u(D.img(f('fCover').value)));
   render();
 
@@ -144,14 +167,64 @@
     f('fStock').value = book ? book.stock : 10;
     f('fPub').value = book ? (book.publisher||'') : '';
     f('fDesc').value = book ? (book.desc||'') : '';
-    const cov = book && COVERS.includes(book.cover) ? book.cover : COVERS[0];
-    f('fCover').value = cov;
-    f('coverPrev').src = K.u(D.img(cov));
+    const cov = book && book.cover ? book.cover : null;
+    fillCoverSelect(cov);
     panel.classList.add('open');
   }
   f('addBtn').addEventListener('click', () => open(null));
   f('closePanel').addEventListener('click', () => panel.classList.remove('open'));
   f('cancelBook').addEventListener('click', () => panel.classList.remove('open'));
+
+  // Downscale in the browser before upload: book covers don't need more
+  // than ~800px width, and a JPEG at 0.88 keeps requests small.
+  function shrinkImage(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const MAX_W = 800, MAX_H = 1280;
+          const scale = Math.min(1, MAX_W / img.naturalWidth, MAX_H / img.naturalHeight);
+          const w = Math.max(1, Math.round(img.naturalWidth * scale));
+          const h = Math.max(1, Math.round(img.naturalHeight * scale));
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          cv.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(cv.toDataURL('image/jpeg', 0.88));
+        } catch (e) { reject(e); }
+        finally { URL.revokeObjectURL(url); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+      img.src = url;
+    });
+  }
+
+  f('uploadCover').addEventListener('click', () => f('coverFile').click());
+  f('coverFile').addEventListener('change', async () => {
+    const file = f('coverFile').files && f('coverFile').files[0];
+    f('coverFile').value = '';
+    if (!file || uploading) return;
+    if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+      K.toast('صيغة غير مدعومة — استخدم PNG أو JPG أو WebP'); return;
+    }
+    uploading = true;
+    f('uploadCover').disabled = true;
+    f('uploadHint').textContent = 'جارٍ الرفع...';
+    try {
+      const dataUrl = await shrinkImage(file);
+      const r = await A.uploadImage(dataUrl);
+      if (!r.ok) { K.toast(A.isOutcomeUnknown(r) ? 'تعذّر الاتصال بالخادم، حاول مرة أخرى.' : A.msg(r.error)); return; }
+      if (!covers.includes(r.data.image)) covers.push(r.data.image);
+      fillCoverSelect(r.data.image);
+      K.toast('تم رفع الغلاف — لا تنسَ حفظ الكتاب');
+    } catch (e) {
+      K.toast('تعذّرت قراءة الصورة من جهازك');
+    } finally {
+      uploading = false;
+      f('uploadCover').disabled = false;
+      f('uploadHint').textContent = '';
+    }
+  });
 
   async function reload(){
     await A.refreshCatalog();

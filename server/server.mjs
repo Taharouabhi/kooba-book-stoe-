@@ -11,14 +11,18 @@
 // Run from the project root: npm install && npm start
 
 import http from "node:http";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, extname, join, posix, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleApp } from "../functions/handler.mjs";
 import { connect } from "./pg-client.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const MAX_BODY = 1024 * 1024;
+// Image uploads travel as base64 JSON; 8 MB leaves headroom above the
+// handler's 5 MB binary cap.
+const MAX_BODY = 8 * 1024 * 1024;
+const IMAGE_FILE_RE = /\.(png|jpe?g|webp)$/i;
+const FILE_SAFE_RE = /^[A-Za-z0-9._-]{1,120}$/;
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -33,7 +37,7 @@ const TYPES = {
   ".ico": "image/x-icon",
 };
 
-async function serveApi(req, res, url, client) {
+async function serveApi(req, res, url, client, files) {
   const chunks = [];
   let size = 0;
   for await (const c of req) {
@@ -53,7 +57,7 @@ async function serveApi(req, res, url, client) {
     headers,
     json: async () => { try { return JSON.parse(raw || "null"); } catch { return null; } },
   };
-  const r = await handleApp({ request, supabase: client });
+  const r = await handleApp({ request, supabase: client, files });
   res.writeHead(r.status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
@@ -85,16 +89,38 @@ async function serveStatic(req, res, url, webDir) {
 
 export function createApp({ client, webDir }) {
   const root = resolve(webDir);
+  const files = makeFiles(root);
   return http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, "http://internal");
-      if (url.pathname === "/functions/v1/app") return await serveApi(req, res, url, client);
+      if (url.pathname === "/functions/v1/app") return await serveApi(req, res, url, client, files);
       return await serveStatic(req, res, url, root);
     } catch {
       res.writeHead(500, { "content-type": "application/json; charset=utf-8" });
       res.end(JSON.stringify({ error: "database_request_failed" }));
     }
   });
+}
+
+// Disk capability behind images.list / admin.upload. Uploaded covers are
+// stored flat in web/assets/img next to the bundled design assets, so the
+// storefront's assets/img/<name> URLs keep working.
+function makeFiles(webDir) {
+  const imgDir = join(webDir, "assets", "img");
+  return {
+    async listImages() {
+      try {
+        const names = await readdir(imgDir);
+        return names.filter((n) => IMAGE_FILE_RE.test(n)).sort();
+      } catch {
+        return [];
+      }
+    },
+    async saveImage(name, bytes) {
+      if (!FILE_SAFE_RE.test(name)) throw new Error("unsafe image name");
+      await writeFile(join(imgDir, name), bytes);
+    },
+  };
 }
 
 async function main() {

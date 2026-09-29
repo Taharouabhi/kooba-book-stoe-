@@ -178,6 +178,25 @@ git pull          # download the latest code
 pm2 restart kouba-store
 ```
 
+## Adding new book covers (on your server)
+
+On your own server the dashboard has an extra the Qoder version doesn't: a
+real **"رفع غلاف من جهازك" (upload cover from your computer)** button inside
+the book editor, and the cover dropdown lists **every** image on the server
+automatically — no manual file copying.
+
+- Accepted formats: **PNG, JPG, WebP**, up to 5 MB. The image is compressed
+  automatically before upload, so big phone photos are fine.
+- Uploaded covers are saved on the server's disk in `web/assets/img/` with
+  names like `up-...png`, and appear in the dropdown immediately.
+- **Back them up:** uploaded images are *not* in git, so `git pull` on the
+  server won't bring them back if the server is ever rebuilt. Copy them to
+  your PC from time to time (PowerShell on your computer):
+  ```powershell
+  scp -r root@YOUR-SERVER-IP:/root/kooba-book-stoe-/web/assets/img "C:\Users\User\Documents\kbs-images-backup"
+  ```
+  Keep the original files on your PC as the master copy.
+
 ## If something goes wrong
 
 | Symptom | Fix |

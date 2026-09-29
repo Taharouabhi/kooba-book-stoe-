@@ -1,14 +1,18 @@
 // Self-host server test — no real database needed.
 // Part A: boots server/server.mjs with the in-memory fake client and drives
 //         it over real HTTP (static pages, catalog, order flow, admin APIs).
+// Part A2: cover image listing/upload against a throwaway web folder.
 // Part B: checks server/pg-client.mjs SQL generation against a recording
 //         stub pool (every query shape the handler can produce).
 // Run from the project root: node dev/self-host-test.mjs
 // Optional: set KBS_ADMIN_PASSWORD to also test admin login/order management.
 
 import http from "node:http";
+import { mkdir, mkdtemp, readFile as readFileFs, writeFile as writeFileFs } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { handleApp } from "../functions/handler.mjs";
 import { createApp } from "../server/server.mjs";
 import { makeClient } from "../server/pg-client.mjs";
 import { newDb, makeClient as makeFake } from "./fake-supabase.mjs";
@@ -111,6 +115,116 @@ if (process.env.KBS_ADMIN_PASSWORD) {
 
 server.closeAllConnections?.();
 server.close();
+
+/* ================= Part A2: cover image list/upload ================= */
+
+console.log("== api: cover images ==");
+const PNG_1x1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+const tmpWeb = await mkdtemp(join(tmpdir(), "kbs-web-"));
+await mkdir(join(tmpWeb, "assets", "img"), { recursive: true });
+await writeFileFs(join(tmpWeb, "assets", "img", "cover-1.png"), Buffer.from(PNG_1x1, "base64"));
+await writeFileFs(join(tmpWeb, "assets", "img", "notes.txt"), "not an image");
+const fake2 = makeFake(newDb());
+const ADMIN_TOKEN = "11111111-1111-4111-8111-111111111111";
+await fake2.from("admin_sessions").insert({
+  id: ADMIN_TOKEN,
+  created_at: new Date().toISOString(),
+  expires_at: new Date(Date.now() + 3600e3).toISOString(),
+});
+const server2 = createApp({ client: fake2, webDir: tmpWeb });
+await new Promise((r) => server2.listen(0, r));
+const base2 = `http://127.0.0.1:${server2.address().port}`;
+const AH = { "x-kbs-admin": ADMIN_TOKEN, "content-type": "application/json" };
+
+{
+  const r = await fetch(base2 + "/functions/v1/app?action=images.list");
+  const body = await r.json();
+  ok("images.list returns img files only",
+    r.status === 200 && Array.isArray(body.images)
+    && body.images.length === 1 && body.images[0] === "cover-1.png",
+    JSON.stringify(body.images));
+
+  const img = await fetch(base2 + "/assets/img/cover-1.png");
+  ok("seed cover served statically", img.status === 200 && img.headers.get("content-type") === "image/png");
+
+  const noAuth = await fetch(base2 + "/functions/v1/app?action=admin.upload", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ dataUrl: "data:image/png;base64," + PNG_1x1 }),
+  });
+  ok("upload requires admin session", noAuth.status === 401);
+}
+let uploadedName = "";
+{
+  const r = await fetch(base2 + "/functions/v1/app?action=admin.upload", {
+    method: "POST", headers: AH,
+    body: JSON.stringify({ dataUrl: "data:image/png;base64," + PNG_1x1 }),
+  });
+  const body = await r.json();
+  ok("upload png 201", r.status === 201 && /^up-[a-z0-9]+-[0-9a-f]{8}\.png$/.test(body.image || ""), JSON.stringify(body));
+  uploadedName = body.image;
+
+  const onDisk = await readFileFs(join(tmpWeb, "assets", "img", uploadedName));
+  ok("uploaded bytes on disk", onDisk.equals(Buffer.from(PNG_1x1, "base64")));
+
+  const list = await (await fetch(base2 + "/functions/v1/app?action=images.list")).json();
+  ok("uploaded cover in images.list", list.images.includes(uploadedName));
+
+  const served = await fetch(base2 + "/assets/img/" + uploadedName);
+  ok("uploaded cover served", served.status === 200);
+}
+{
+  const jpegMagic = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
+  const r = await fetch(base2 + "/functions/v1/app?action=admin.upload", {
+    method: "POST", headers: AH,
+    body: JSON.stringify({ dataUrl: "data:image/png;base64," + jpegMagic.toString("base64") }),
+  });
+  const body = await r.json();
+  ok("extension follows magic bytes", r.status === 201 && /\.jpg$/.test(body.image || ""), JSON.stringify(body));
+}
+{
+  const bad1 = await fetch(base2 + "/functions/v1/app?action=admin.upload", {
+    method: "POST", headers: AH, body: JSON.stringify({ dataUrl: "data:text/plain;base64,aGVsbG8=" }),
+  });
+  ok("rejects non-image data url", bad1.status === 400 && (await bad1.json()).error === "invalid_image");
+
+  const bad2 = await fetch(base2 + "/functions/v1/app?action=admin.upload", {
+    method: "POST", headers: AH, body: JSON.stringify({ dataUrl: "data:image/png;base64,!!!not-base64!!!" }),
+  });
+  ok("rejects garbage base64", bad2.status === 400 && (await bad2.json()).error === "invalid_image");
+
+  const bad3 = await fetch(base2 + "/functions/v1/app?action=admin.upload", {
+    method: "POST", headers: AH,
+    body: JSON.stringify({ dataUrl: "data:image/png;base64," + Buffer.from("just some text").toString("base64") }),
+  });
+  ok("rejects image-claimed text bytes", bad3.status === 400 && (await bad3.json()).error === "invalid_image");
+
+  const big = Buffer.alloc(5 * 1024 * 1024 + 1);
+  big.set([0x89, 0x50, 0x4e, 0x47]);
+  const bad4 = await fetch(base2 + "/functions/v1/app?action=admin.upload", {
+    method: "POST", headers: AH,
+    body: JSON.stringify({ dataUrl: "data:image/png;base64," + big.toString("base64") }),
+  });
+  ok("rejects oversize image", bad4.status === 400 && (await bad4.json()).error === "image_too_large");
+}
+{
+  const callDirect = (method, action, body, hdrs = {}) => handleApp({
+    request: {
+      method,
+      url: "http://internal/functions/v1/app?action=" + action,
+      headers: new Map(Object.entries(hdrs)),
+      json: async () => body ?? null,
+    },
+    supabase: fake2,
+  });
+  const listR = await callDirect("GET", "images.list");
+  ok("no capability: images.list null", (await listR.json()).images === null);
+  const upR = await callDirect("POST", "admin.upload",
+    { dataUrl: "data:image/png;base64," + PNG_1x1 }, { "x-kbs-admin": ADMIN_TOKEN });
+  ok("no capability: upload unsupported", upR.status === 400 && (await upR.json()).error === "unsupported");
+}
+
+server2.closeAllConnections?.();
+server2.close();
 
 /* ================= Part B: pg adapter SQL against a stub ================= */
 

@@ -24,6 +24,10 @@
     invalid_item: "أحد المنتجات في سلتك لم يعد متوفراً، حدّث السلة وحاول مجدداً.",
     out_of_stock: "أحد الكتب في سلتك نفدت كميته حالياً، حدّث السلة وحاول مجدداً.",
     database_request_failed: "تعذّر تنفيذ العملية، حاول مجدداً بعد لحظات.",
+    unsupported: "رفع الصور متاح فقط على النسخة المستضافة على خادمك الخاص.",
+    invalid_image: "الملف ليس صورة مدعومة. الصيغ المقبولة: PNG أو JPG أو WebP.",
+    image_too_large: "حجم الصورة أكبر من 5 ميجابايت، صغّر الصورة وحاول مجدداً.",
+    upload_failed: "تعذّر حفظ الصورة على الخادم، حاول مرة أخرى.",
   };
   const msg = (code) => MESSAGES[code] || "حدث خطأ غير متوقع، حاول مرة أخرى.";
 
@@ -142,6 +146,14 @@
     return catalogPromise;
   }
 
+  /* ---------- cover images ---------- */
+  function listImages() {
+    return request("images.list");
+  }
+  function uploadImage(dataUrl) {
+    return adminRequest("admin.upload", { dataUrl });
+  }
+
   /* ---------- checkout ---------- */
   function createOrder(payload) {
     return request("order.create", { method: "POST", body: payload });
@@ -171,6 +183,8 @@
     createOrder,
     isOutcomeUnknown,
     msg,
+    listImages,
+    uploadImage,
     getAdminToken,
     setAdminToken,
     requireAdminSession,

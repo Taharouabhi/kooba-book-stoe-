@@ -1,9 +1,13 @@
 // Kouba Book Store — application handler.
-// Public actions: catalog.list, order.create.
+// Public actions: catalog.list, order.create, images.list.
 // Admin actions: admin.login/logout/session, admin.orders, admin.order.setStatus,
 // admin.stats, admin.books.save/delete, admin.categories.save/delete,
-// admin.bundles.save/delete, admin.settings.save, admin.password.change.
+// admin.bundles.save/delete, admin.settings.save, admin.password.change,
+// admin.upload.
 // Responses use fixed error codes; provider details never reach the browser.
+// Image actions use an optional "files" capability ({ listImages, saveImage });
+// without it images.list reports null and admin.upload is unsupported, which is
+// how the Qoder deployment (read-only function) behaves.
 
 import { SEED } from "./seed.mjs";
 
@@ -25,6 +29,13 @@ const ID_RE = /^[a-z0-9][a-z0-9-]{0,39}$/i;
 const FILE_RE = /^[A-Za-z0-9._-]{1,120}$/;
 const HASH_RE = /^[0-9a-f]{64}$/;
 const ICONS = new Set(["book", "landmark", "feather", "moon", "bulb", "atom", "smile", "grid"]);
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_DATAURL_CHARS = 8_000_000;
+const IMAGE_MAGIC = [
+  { ext: "png", test: (b) => b.length > 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
+  { ext: "jpg", test: (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  { ext: "webp", test: (b) => b.length > 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50 },
+];
 
 const str = (v, max) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const bool = (v) => v === true;
@@ -493,9 +504,59 @@ async function deleteRow(supabase, table, rawId) {
   return json({ ok: true });
 }
 
+/* ================= images =================
+   Cover uploads only exist where the host can write the web folder
+   (the self-hosted server). The handler validates content itself; the
+   injected capability only persists bytes under a handler-chosen name. */
+
+function decodeImageDataUrl(raw) {
+  if (typeof raw !== "string" || raw.length > MAX_DATAURL_CHARS) return null;
+  const m = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\s]+)$/.exec(raw);
+  if (!m) return null;
+  let bin;
+  try { bin = atob(m[2].replace(/\s+/g, "")); } catch { return null; }
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function detectImageExt(bytes) {
+  for (const { ext, test } of IMAGE_MAGIC) if (test(bytes)) return ext;
+  return null;
+}
+
+async function listImages(request, files) {
+  if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+  if (!files || typeof files.listImages !== "function") return json({ images: null });
+  try {
+    const images = await files.listImages();
+    return json({ images: Array.isArray(images) ? images : [] });
+  } catch {
+    return json({ error: "database_request_failed" }, 503);
+  }
+}
+
+async function uploadImage(body, files) {
+  if (!files || typeof files.saveImage !== "function") {
+    return json({ error: "unsupported" }, 400);
+  }
+  const bytes = decodeImageDataUrl(body && body.dataUrl);
+  if (!bytes) return json({ error: "invalid_image" }, 400);
+  if (bytes.length > MAX_IMAGE_BYTES) return json({ error: "image_too_large" }, 400);
+  const ext = detectImageExt(bytes);
+  if (!ext) return json({ error: "invalid_image" }, 400);
+  const name = `up-${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  try {
+    await files.saveImage(name, bytes);
+  } catch {
+    return json({ error: "upload_failed" }, 503);
+  }
+  return json({ image: name }, 201);
+}
+
 /* ================= router ================= */
 
-export async function handleApp({ request, supabase }) {
+export async function handleApp({ request, supabase, files }) {
   const params = new URL(request.url).searchParams;
   const action = params.get("action") || "";
   try {
@@ -504,6 +565,7 @@ export async function handleApp({ request, supabase }) {
       const { books, categories, bundles, settings } = await readCatalog(supabase);
       return json({ books, categories, bundles, settings });
     }
+    if (action === "images.list") return await listImages(request, files);
     if (action === "order.create") return await createOrder(request, supabase);
     if (action === "admin.login") return await adminLogin(request, supabase);
     if (action === "admin.logout") return await adminLogout(request, supabase);
@@ -520,6 +582,8 @@ export async function handleApp({ request, supabase }) {
 
       if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
       const body = await readBody(request);
+
+      if (action === "admin.upload") return await uploadImage(body, files);
 
       if (action === "admin.books.save") {
         const book = cleanBook(body && (body.book || body));
