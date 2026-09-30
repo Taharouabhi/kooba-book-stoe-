@@ -18,6 +18,24 @@ certificate (HTTPS). Expected cost: about **$5–6/month for the server** plus
 
 ---
 
+## Optional — try it on this PC first (no server needed)
+
+You don't have to buy anything to see the self-hosted store, including the
+extra **cover upload** button. Open PowerShell in this project's folder and
+run:
+
+```powershell
+npm run local-preview
+```
+
+Then open **http://localhost:8080** in your browser (dashboard:
+`http://localhost:8080/admin/login.html` — same password as today). This
+preview only exists on this computer, and orders/edits are forgotten when
+you stop it with `Ctrl+C` — everything else behaves exactly like the real
+server will.
+
+---
+
 ## Step 0 — What to buy
 
 1. **A server (VPS).** Any of these entry plans is plenty for a bookstore:
